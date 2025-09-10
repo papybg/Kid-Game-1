@@ -1,0 +1,23 @@
+{
+  "id": "d1",
+  "name": "Зелена долина - Ниво 1",
+  "backgroundLarge": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&h=1080",
+  "backgroundSmall": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=768&h=1024",
+  "slots": [
+    {
+      "index": [1, 2],
+      "position": { "top": "20%", "left": "30%" },
+      "diameter": "64px"
+    },
+    {
+      "index": [3, 4],
+      "position": { "top": "60%", "left": "70%" },
+      "diameter": "64px"
+    },
+    {
+      "index": [5, 6],
+      "position": { "top": "40%", "left": "15%" },
+      "diameter": "64px"
+    }
+  ]
+}
