@@ -66,9 +66,11 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     };
 
     const freqs = frequencies[type];
-    freqs.forEach((freq, index) => {
-      setTimeout(() => playTone(freq, 0.2), index * 100);
-    });
+    if (freqs && Array.isArray(freqs)) {
+      freqs.forEach((freq, index) => {
+        setTimeout(() => playTone(freq, 0.2), index * 100);
+      });
+    }
   };
 
   return (
