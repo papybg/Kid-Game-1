@@ -198,7 +198,7 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
       {/* Game Footer */}
       <div className="absolute bottom-0 left-0 right-0 z-20 p-4 bg-gradient-to-t from-black/50 to-transparent">
         {/* Start Turn Button */}
-        {!gameState.isPlaying && !isGameComplete && gameState.availableSlots.length > 0 && (
+        {!gameState.isPlaying && (
           <div className="text-center mb-4">
             <Button
               onClick={handleStartTurn}
