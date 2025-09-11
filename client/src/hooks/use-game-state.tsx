@@ -112,7 +112,7 @@ export function useGameState() {
     setFeedback(initialFeedback);
   }, []);
 
-  const isGameComplete = gameState.availableSlots.length === 0 && !gameState.isPlaying;
+  const isGameComplete = gameState.startTime > 0 && gameState.availableSlots.length === 0 && !gameState.isPlaying;
   const timeElapsed = gameState.startTime ? Math.floor((Date.now() - gameState.startTime) / 1000) : 0;
 
   return {
