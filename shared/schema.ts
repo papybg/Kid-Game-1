@@ -19,7 +19,7 @@ export const gameItems = pgTable("game_items", {
   id: integer("id").primaryKey(),
   name: text("name").notNull(),
   image: text("image").notNull(),
-  index: integer("index").notNull(),
+  index: text("index").notNull(),
   category: text("category"),
   createdAt: timestamp("created_at").default(sql`now()`),
 });
@@ -31,7 +31,7 @@ export const gameLayouts = pgTable("game_layouts", {
   backgroundLarge: text("background_large").notNull(),
   backgroundSmall: text("background_small").notNull(),
   slots: jsonb("slots").notNull().$type<Array<{
-    index: number[];
+    index: string[];
     position: { top: string; left: string };
     diameter: string;
   }>>(),
@@ -83,7 +83,7 @@ export type InsertGameSettings = z.infer<typeof insertGameSettingsSchema>;
 
 // Game-specific types
 export interface GameSlot {
-  index: number[];
+  index: string[];
   position: { top: string; left: string };
   diameter: string;
 }
