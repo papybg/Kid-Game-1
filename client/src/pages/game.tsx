@@ -35,13 +35,13 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
   } = useGameState();
 
   // Fetch layout data
-  const { data: layout, isLoading: layoutLoading } = useQuery({
+  const { data: layout, isLoading: layoutLoading } = useQuery<GameLayout>({
     queryKey: ['/api/layouts', portal.layouts[0]],
     enabled: !!portal,
   });
 
   // Fetch game items
-  const { data: allItems, isLoading: itemsLoading } = useQuery({
+  const { data: allItems, isLoading: itemsLoading } = useQuery<GameItem[]>({
     queryKey: ['/api/game-items'],
   });
 

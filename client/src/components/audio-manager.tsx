@@ -9,7 +9,7 @@ type AudioContextType = {
   setSoundEnabled: (enabled: boolean) => void;
   setMusicEnabled: (enabled: boolean) => void;
   setEffectsEnabled: (enabled: boolean) => void;
-  playSound: (type: 'success' | 'error' | 'click' | 'start') => void;
+  playSound: (type: 'success' | 'error' | 'click' | 'start' | 'win') => void;
   initializeAudio: () => Promise<void>;
 };
 
@@ -55,7 +55,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const playSound = (type: 'success' | 'error' | 'click' | 'start') => {
+  const playSound = (type: 'success' | 'error' | 'click' | 'start' | 'win') => {
     if (!isInitialized || !soundEnabled || !effectsEnabled) return;
 
     const frequencies = {
@@ -63,6 +63,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       error: [220, 233, 246], // A, A#, B (dissonant)
       click: [800], // High click
       start: [261, 329, 392], // C, E, G (major chord)
+      win: [523, 659, 784, 1047], // C, E, G, C (victory fanfare)
     };
 
     const freqs = frequencies[type];
