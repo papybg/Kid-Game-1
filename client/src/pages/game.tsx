@@ -198,14 +198,14 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
       {/* Game Footer */}
       <div className="absolute bottom-0 left-0 right-0 z-20 p-4 bg-gradient-to-t from-black/50 to-transparent">
         {/* Start Turn Button */}
-        {!gameState.isPlaying && !isGameComplete && (
+        {!gameState.isPlaying && !isGameComplete && gameState.availableSlots.length > 0 && (
           <div className="text-center mb-4">
             <Button
               onClick={handleStartTurn}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-3 px-8 rounded-2xl text-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+              className="bg-white text-primary font-semibold py-4 px-12 rounded-2xl text-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 border-4 border-yellow-400"
               data-testid="button-start-turn"
             >
-              <Play className="w-5 h-5 mr-2" />
+              <Play className="w-6 h-6 mr-3" />
               СТАРТ
             </Button>
           </div>
