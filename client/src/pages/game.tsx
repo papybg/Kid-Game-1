@@ -195,21 +195,24 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
       {/* Feedback Messages */}
       <FeedbackMessageComponent feedback={feedback} />
       
-      {/* Game Footer */}
-      <div className="absolute bottom-0 left-0 right-0 z-20 p-4 bg-gradient-to-t from-black/50 to-transparent">
-        {/* Start Turn Button */}
-        {!gameState.isPlaying && (
-          <div className="text-center mb-4">
+      {/* Floating START Button */}
+      {!gameState.isPlaying && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+          <div className="pointer-events-auto">
             <Button
               onClick={handleStartTurn}
-              className="bg-white text-primary font-semibold py-4 px-12 rounded-2xl text-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 border-4 border-yellow-400"
+              className="bg-white text-primary font-bold py-6 px-16 rounded-3xl text-2xl transition-all duration-200 shadow-2xl hover:shadow-3xl transform hover:scale-105 border-4 border-yellow-400 animate-pulse"
               data-testid="button-start-turn"
             >
-              <Play className="w-6 h-6 mr-3" />
+              <Play className="w-8 h-8 mr-4" />
               СТАРТ
             </Button>
           </div>
-        )}
+        </div>
+      )}
+
+      {/* Game Footer */}
+      <div className="absolute bottom-0 left-0 right-0 z-20 p-4 bg-gradient-to-t from-black/50 to-transparent pb-[calc(env(safe-area-inset-bottom)+16px)]">
         
         {/* Choice Zone */}
         {gameState.isPlaying && (
