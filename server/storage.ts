@@ -181,7 +181,12 @@ export class MemStorage implements IStorage {
 
   async createPortal(portal: InsertPortal): Promise<Portal> {
     const newPortal: Portal = {
-      ...portal,
+      id: portal.id,
+      name: portal.name,
+      icon: portal.icon,
+      layouts: Array.isArray(portal.layouts) ? [...portal.layouts] : [],
+      difficulty: portal.difficulty,
+      isLocked: portal.isLocked ?? null,
       createdAt: new Date(),
     };
     this.portals.set(newPortal.id, newPortal);
@@ -200,6 +205,7 @@ export class MemStorage implements IStorage {
   async createGameItem(item: InsertGameItem): Promise<GameItem> {
     const newItem: GameItem = {
       ...item,
+      category: item.category ?? null, // Convert undefined to null
       createdAt: new Date(),
     };
     this.gameItems.set(newItem.id, newItem);
@@ -217,7 +223,11 @@ export class MemStorage implements IStorage {
 
   async createGameLayout(layout: InsertGameLayout): Promise<GameLayout> {
     const newLayout: GameLayout = {
-      ...layout,
+      id: layout.id,
+      name: layout.name,
+      backgroundLarge: layout.backgroundLarge,
+      backgroundSmall: layout.backgroundSmall,
+      slots: (layout.slots as any) || [],
       createdAt: new Date(),
     };
     this.gameLayouts.set(newLayout.id, newLayout);
@@ -232,7 +242,11 @@ export class MemStorage implements IStorage {
   async createUserProgress(progress: InsertUserProgress): Promise<UserProgress> {
     const newProgress: UserProgress = {
       id: randomUUID(),
-      ...progress,
+      portalId: progress.portalId,
+      layoutId: progress.layoutId,
+      score: progress.score ?? null, // Convert undefined to null
+      timeSpent: progress.timeSpent ?? null, // Convert undefined to null
+      sessionData: progress.sessionData ?? null, // Convert undefined to null
       completedAt: new Date(),
     };
     this.userProgress.push(newProgress);
