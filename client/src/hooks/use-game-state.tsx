@@ -7,7 +7,6 @@ const initialGameState: GameState = {
   isPlaying: false,
   isPaused: false,
   availableSlots: [],
-  activeSlot: null,
   choiceItems: [],
   usedItems: [],
   placedItems: {},
@@ -32,7 +31,6 @@ export function useGameState() {
       isPlaying: false,
       isPaused: false,
       availableSlots: [...layout.slots],
-      activeSlot: null,
       choiceItems: items,
       usedItems: [],
       placedItems: {},
@@ -45,7 +43,6 @@ export function useGameState() {
     setGameState(prev => ({
       ...prev,
       isPlaying: true,
-      activeSlot: null, // Remove slot-first logic
     }));
   }, []);
 
@@ -60,37 +57,23 @@ export function useGameState() {
     // Generate slot ID for tracking placement
     const slotId = `${matchingSlot.position.top}-${matchingSlot.position.left}`;
 
-    setGameState(prev => ({
-      ...prev,
-      usedItems: [...prev.usedItems, item.id],
-      availableSlots: prev.availableSlots.filter(slot => slot !== matchingSlot),
-      placedItems: { ...prev.placedItems, [slotId]: item },
-      activeSlot: null,
-      score: prev.score + 10,
-    }));
+    setGameState(prev => {
+      const newAvailableSlots = prev.availableSlots.filter(slot => slot !== matchingSlot);
+      return {
+        ...prev,
+        usedItems: [...prev.usedItems, item.id],
+        availableSlots: newAvailableSlots,
+        placedItems: { ...prev.placedItems, [slotId]: item },
+        score: prev.score + 10,
+        // Auto-complete game when no more slots available
+        isPlaying: newAvailableSlots.length > 0,
+      };
+    });
 
     return true;
   }, [gameState]);
 
-  const nextSlot = useCallback(() => {
-    setGameState(prev => {
-      if (prev.availableSlots.length === 0) {
-        return {
-          ...prev,
-          isPlaying: false,
-          activeSlot: null,
-        };
-      }
-
-      const randomIndex = Math.floor(Math.random() * prev.availableSlots.length);
-      const activeSlot = prev.availableSlots[randomIndex];
-
-      return {
-        ...prev,
-        activeSlot,
-      };
-    });
-  }, []);
+  // Removed nextSlot - no longer needed with item-first logic
 
   const showFeedback = useCallback((type: 'success' | 'error', message: string) => {
     setFeedback({ type, message, isVisible: true });
@@ -120,7 +103,6 @@ export function useGameState() {
     startGame,
     startTurn,
     makeChoice,
-    nextSlot,
     showFeedback,
     pauseGame,
     resetGame,

@@ -94,7 +94,6 @@ export interface GameState {
   isPlaying: boolean;
   isPaused: boolean;
   availableSlots: GameSlot[];
-  activeSlot: GameSlot | null;
   choiceItems: GameItem[];
   usedItems: number[];
   placedItems: Record<string, GameItem>; // Key: slotId, Value: placed item

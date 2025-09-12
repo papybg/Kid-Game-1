@@ -27,7 +27,6 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
     startGame,
     startTurn,
     makeChoice,
-    nextSlot,
     showFeedback,
     pauseGame,
     isGameComplete,
@@ -189,7 +188,7 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
             <GameSlotComponent
               key={slotId}
               slot={slot}
-              isActive={gameState.activeSlot === slot}
+              isActive={false} // No more active slot highlighting
               className="pointer-events-auto"
             />
           );
