@@ -10,6 +10,7 @@ const initialGameState: GameState = {
   activeSlot: null,
   choiceItems: [],
   usedItems: [],
+  placedItems: {},
   score: 0,
   startTime: 0,
 };
@@ -34,43 +35,41 @@ export function useGameState() {
       activeSlot: null,
       choiceItems: items,
       usedItems: [],
+      placedItems: {},
       score: 0,
       startTime: Date.now(),
     });
   }, []);
 
   const startTurn = useCallback(() => {
-    setGameState(prev => {
-      if (prev.availableSlots.length === 0) return prev;
-
-      const randomIndex = Math.floor(Math.random() * prev.availableSlots.length);
-      const activeSlot = prev.availableSlots[randomIndex];
-
-      return {
-        ...prev,
-        isPlaying: true,
-        activeSlot,
-      };
-    });
+    setGameState(prev => ({
+      ...prev,
+      isPlaying: true,
+      activeSlot: null, // Remove slot-first logic
+    }));
   }, []);
 
   const makeChoice = useCallback((item: GameItem): boolean => {
-    const { activeSlot } = gameState;
-    if (!activeSlot) return false;
+    const { availableSlots } = gameState;
+    
+    // Find a matching slot for this item (item-first logic)
+    const matchingSlot = availableSlots.find(slot => slot.index.includes(item.index));
+    
+    if (!matchingSlot) return false;
 
-    const isValid = activeSlot.index.includes(item.index);
+    // Generate slot ID for tracking placement
+    const slotId = `${matchingSlot.position.top}-${matchingSlot.position.left}`;
 
-    if (isValid) {
-      setGameState(prev => ({
-        ...prev,
-        usedItems: [...prev.usedItems, item.id],
-        availableSlots: prev.availableSlots.filter(slot => slot !== activeSlot),
-        activeSlot: null,
-        score: prev.score + 10,
-      }));
-    }
+    setGameState(prev => ({
+      ...prev,
+      usedItems: [...prev.usedItems, item.id],
+      availableSlots: prev.availableSlots.filter(slot => slot !== matchingSlot),
+      placedItems: { ...prev.placedItems, [slotId]: item },
+      activeSlot: null,
+      score: prev.score + 10,
+    }));
 
-    return isValid;
+    return true;
   }, [gameState]);
 
   const nextSlot = useCallback(() => {

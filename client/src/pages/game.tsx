@@ -149,9 +149,7 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
             <h1 className="font-display font-bold text-xl md:text-2xl">{portal.name}</h1>
             <div className="text-sm bg-white/20 backdrop-blur-sm rounded-full px-4 py-1 mt-2 inline-block">
               {gameState.isPlaying
-                ? gameState.activeSlot
-                  ? "Какво ще има тук?"
-                  : "Изберете"
+                ? "Избери предмет – ще отиде на мястото си!"
                 : "Натисни СТАРТ за да започнеш!"
               }
             </div>
@@ -182,14 +180,37 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
       
       {/* Game Slots Overlay */}
       <div className="absolute inset-0 z-10 pointer-events-none">
-        {gameState.availableSlots.map((slot, index) => (
-          <GameSlotComponent
-            key={`${slot.position.top}-${slot.position.left}`}
-            slot={slot}
-            isActive={gameState.activeSlot === slot}
-            className="pointer-events-auto"
-          />
-        ))}
+        {/* Available slots (empty) */}
+        {gameState.availableSlots.map((slot, index) => {
+          const slotId = `${slot.position.top}-${slot.position.left}`;
+          return (
+            <GameSlotComponent
+              key={slotId}
+              slot={slot}
+              isActive={gameState.activeSlot === slot}
+              className="pointer-events-auto"
+            />
+          );
+        })}
+        
+        {/* Placed items (filled slots) */}
+        {layout && Object.entries(gameState.placedItems).map(([slotId, item]) => {
+          // Find the original slot definition for positioning
+          const [top, left] = slotId.split('-');
+          const originalSlot = layout.slots.find(s => s.position.top === top && s.position.left === left);
+          
+          if (!originalSlot) return null;
+          
+          return (
+            <GameSlotComponent
+              key={`filled-${slotId}`}
+              slot={originalSlot}
+              isCompleted={true}
+              placedItem={item}
+              className="pointer-events-auto"
+            />
+          );
+        })}
       </div>
       
       {/* Feedback Messages */}

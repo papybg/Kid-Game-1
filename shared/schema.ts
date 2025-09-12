@@ -97,6 +97,7 @@ export interface GameState {
   activeSlot: GameSlot | null;
   choiceItems: GameItem[];
   usedItems: number[];
+  placedItems: Record<string, GameItem>; // Key: slotId, Value: placed item
   score: number;
   startTime: number;
 }
