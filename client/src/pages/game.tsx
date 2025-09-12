@@ -19,7 +19,7 @@ interface GameProps {
 
 export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const { soundEnabled, setSoundEnabled, playSound } = useAudioContext();
+  const { soundEnabled, setSoundEnabled, playSound, playVoice, playAnimalSound } = useAudioContext();
   
   const {
     gameState,
@@ -82,15 +82,17 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
     
     if (isValid) {
       showFeedback('success', 'Браво!');
-      playSound('success');
+      
+      // Play "BRAВО" voice first, then animal sound
+      playVoice('bravo');
       setTimeout(() => {
-        if (!isGameComplete) {
-          nextSlot();
-        }
-      }, 1500);
+        playAnimalSound(item.index);
+      }, 800); // Delay animal sound to play after "BRAVO"
+      
+      // No need to call nextSlot() - the new logic handles completion automatically
     } else {
       showFeedback('error', 'Опитай пак!');
-      playSound('error');
+      playVoice('tryAgain');
     }
   };
 
