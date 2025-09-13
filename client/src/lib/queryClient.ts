@@ -1,5 +1,15 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+// Build a request URL using optional VITE_API_BASE (for production builds like Netlify)
+function buildUrl(path: string) {
+  // Vite exposes env vars on import.meta.env; VITE_* variables are user-defined
+  const rawBase = import.meta.env?.VITE_API_BASE ?? "";
+  const base = String(rawBase).toString().trim().replace(/\/+$/, "");
+  const cleaned = path.replace(/^\/+/, "");
+  if (base) return `${base}/${cleaned}`;
+  return `/${cleaned}`;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = await res.text();
@@ -20,7 +30,7 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   try {
-    const res = await fetch(`/${url}`, {
+    const res = await fetch(buildUrl(url), {
       method,
       headers: data ? { "Content-Type": "application/json" } : {},
       body: data ? JSON.stringify(data) : undefined,
@@ -43,7 +53,7 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     try {
       const url = `/${queryKey.join("/").replace(/^\/+/, '')}`;
-      const res = await fetch(url, {
+      const res = await fetch(buildUrl(url), {
         credentials: "include",
       });
 
