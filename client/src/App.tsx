@@ -1,15 +1,15 @@
 import { useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
-import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { ThemeProvider } from "@/components/theme-provider";
-import { AudioProvider } from "@/components/audio-manager";
+import { Toaster } from "./components/ui/toaster";
+import { TooltipProvider } from "./components/ui/tooltip";
+import { ThemeProvider } from "./components/theme-provider";
+import { AudioProvider } from "./components/audio-manager";
 
-import Welcome from "@/pages/welcome";
-import PortalSelection from "@/pages/portal-selection";
-import Game from "@/pages/game";
-import Win from "@/pages/win";
+import Welcome from "./pages/welcome";
+import PortalSelection from "./pages/portal-selection";
+import Game from "./pages/game";
+import Win from "./pages/win";
 
 import type { Portal } from "@shared/schema";
 
