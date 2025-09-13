@@ -1,0 +1,19 @@
+[33m4497ed8[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m промени с Claud Sonet- работещ проект
+[33me25fa68[m Initial setup: database configuration and path fixes
+[33mff696ea[m Improve application performance by optimizing data fetching
+[33m9c9b4be[m Update game logic to allow animals to move to their correct locations
+[33md97c868[m Update game data structure to ensure correct item placement and scoring
+[33m0f19a11[m Add voice feedback and animal sounds to the game
+[33m7ea2bdd[m Update game to place animals and objects in correct spots
+[33ma6ac8a6[m Improve the overall user experience and performance of the educational game
+[33m226c91d[m Update game items with new images and categories
+[33m2918fe4[m Replace image URLs with embedded SVG data for game assets
+[33m7822cd6[m Make the start game button more prominent and engaging
+[33m8b50606[m Add visual assets for the educational game
+[33m77ef94e[m Update game start condition to allow playing even if no slots are available
+[33me51df73[m Improve the start turn button styling and logic for the game
+[33m8a49f07[m Add winning sound effect and improve game data fetching
+[33m08780ae[m Update game logic to correctly determine when a game level is finished
+[33m92332c7[m Update audio playback to handle missing frequency data
+[33m09fa8a4[m Add base UI components and game structure for the educational game
+[33m2bd5b48[m Initial commit
