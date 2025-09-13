@@ -1,6 +1,6 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "../components/ui/button";
 import { Trophy, Star, ArrowRight, RotateCcw, Home } from "lucide-react";
-import { formatTime, getStarRating } from "@/lib/game-logic";
+import { formatTime, getStarRating } from "../lib/game-logic";
 
 interface WinProps {
   score: number;

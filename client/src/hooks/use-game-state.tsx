@@ -1,7 +1,20 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { GameState, GameSlot, GameItem, Portal, GameLayout, FeedbackMessage } from '@shared/schema';
 
-const initialGameState: GameState = {
+// Load saved state from localStorage
+const loadSavedState = (): GameState | null => {
+  try {
+    const saved = localStorage.getItem('gameState');
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch (e) {
+    console.error('Failed to load saved game state:', e);
+  }
+  return null;
+};
+
+const initialGameState: GameState = loadSavedState() || {
   currentPortal: null,
   currentLayout: null,
   isPlaying: false,
@@ -25,7 +38,7 @@ export function useGameState() {
   const [feedback, setFeedback] = useState<FeedbackMessage>(initialFeedback);
 
   const startGame = useCallback((portal: Portal, layout: GameLayout, items: GameItem[]) => {
-    setGameState({
+    const newState = {
       currentPortal: portal,
       currentLayout: layout,
       isPlaying: false,
@@ -36,7 +49,13 @@ export function useGameState() {
       placedItems: {},
       score: 0,
       startTime: Date.now(),
-    });
+    };
+    setGameState(newState);
+    try {
+      localStorage.setItem('gameState', JSON.stringify(newState));
+    } catch (e) {
+      console.error('Failed to save game state:', e);
+    }
   }, []);
 
   const startTurn = useCallback(() => {
@@ -58,16 +77,22 @@ export function useGameState() {
     const slotId = `${matchingSlot.position.top}-${matchingSlot.position.left}`;
 
     setGameState(prev => {
-      const newAvailableSlots = prev.availableSlots.filter(slot => slot !== matchingSlot);
-      return {
+      const newState = {
         ...prev,
         usedItems: [...prev.usedItems, item.id],
-        availableSlots: newAvailableSlots,
+        availableSlots: prev.availableSlots.filter(slot => slot !== matchingSlot),
         placedItems: { ...prev.placedItems, [slotId]: item },
         score: prev.score + 10,
-        // Auto-complete game when no more slots available
-        isPlaying: newAvailableSlots.length > 0,
+        isPlaying: prev.availableSlots.length > 1, // Keep playing if more than 1 slot (current one will be removed)
       };
+      
+      try {
+        localStorage.setItem('gameState', JSON.stringify(newState));
+      } catch (e) {
+        console.error('Failed to save game state:', e);
+      }
+      
+      return newState;
     });
 
     return true;
@@ -92,6 +117,7 @@ export function useGameState() {
   const resetGame = useCallback(() => {
     setGameState(initialGameState);
     setFeedback(initialFeedback);
+    localStorage.removeItem('gameState');
   }, []);
 
   const isGameComplete = gameState.startTime > 0 && gameState.availableSlots.length === 0 && !gameState.isPlaying;

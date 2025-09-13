@@ -1,5 +1,5 @@
-import { cn } from "@/lib/utils";
-import type { GameSlot, GameItem } from "@shared/schema";
+import { cn } from "../ui/utils";
+import type { GameSlot, GameItem } from "../../../shared/schema";
 
 interface GameSlotProps {
   slot: GameSlot;

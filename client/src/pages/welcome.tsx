@@ -1,6 +1,6 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "../components/ui/button";
 import { Settings, Play, Brain, Gamepad2, Smartphone, Volume2 } from "lucide-react";
-import { useAudioContext } from "@/components/audio-manager";
+import { useAudioContext } from "../components/audio-manager";
 
 interface WelcomeProps {
   onEnterGame: () => void;
@@ -36,7 +36,7 @@ export default function Welcome({ onEnterGame, onOpenSettings }: WelcomeProps) {
         
         {/* Features */}
         <div className="grid grid-cols-2 gap-4 text-sm text-blue-100 animate-slide-up" style={{ animationDelay: "0.2s" }}>
-          <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2">
             <Brain className="w-4 h-4 text-blue-200" />
             <span>Развива мисленето</span>
           </div>

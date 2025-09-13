@@ -1,9 +1,9 @@
-import { Button } from "@/components/ui/button";
+import { Button } from "../components/ui/button";
 import { ArrowLeft, Moon, Sun, Star, PuzzleIcon } from "lucide-react";
-import { useTheme } from "@/components/theme-provider";
+import { useTheme } from "../components/theme-provider";
 import { useQuery } from "@tanstack/react-query";
-import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import type { Portal } from "@shared/schema";
+import { LoadingSpinner } from "../components/ui/loading-spinner";
+import type { Portal } from "../../shared/schema";
 
 interface PortalSelectionProps {
   onBackToWelcome: () => void;
@@ -13,8 +13,10 @@ interface PortalSelectionProps {
 export default function PortalSelection({ onBackToWelcome, onSelectPortal }: PortalSelectionProps) {
   const { theme, setTheme } = useTheme();
 
-  const { data: portals, isLoading, error } = useQuery({
-    queryKey: ['/api/portals'],
+  const { data: portals = [], isLoading, error } = useQuery<Portal[]>({
+    queryKey: ['api/portals'],
+    retry: 2,
+    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
   });
 
   const toggleTheme = () => {
@@ -36,7 +38,10 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
     return (
       <div className="fixed inset-0 z-40 flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
-          <p className="text-destructive">Грешка при зареждане на световете</p>
+          <p className="text-destructive">Грешка при зареждане на световете:</p>
+          <pre className="text-sm bg-gray-100 p-4 rounded">
+            {error instanceof Error ? error.message : JSON.stringify(error, null, 2)}
+          </pre>
           <Button onClick={() => window.location.reload()}>Опитай отново</Button>
         </div>
       </div>

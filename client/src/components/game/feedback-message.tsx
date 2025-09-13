@@ -1,5 +1,5 @@
-import { cn } from "@/lib/utils";
-import type { FeedbackMessage } from "@shared/schema";
+import { cn } from "../ui/utils";
+import type { FeedbackMessage } from "../../../shared/types";
 
 interface FeedbackMessageProps {
   feedback: FeedbackMessage;

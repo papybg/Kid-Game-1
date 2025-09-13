@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Button } from "../components/ui/button";
 import { ArrowLeft, Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { GameSlotComponent } from "@/components/game/game-slot";
-import { ChoiceItem } from "@/components/game/choice-item";
-import { FeedbackMessageComponent } from "@/components/game/feedback-message";
-import { useGameState } from "@/hooks/use-game-state";
-import { useAudioContext } from "@/components/audio-manager";
-import { generateChoicePool } from "@/lib/game-logic";
+import { LoadingSpinner } from "../components/ui/loading-spinner";
+import { GameSlotComponent } from "../components/game/game-slot";
+import { ChoiceItem } from "../components/game/choice-item";
+import { FeedbackMessageComponent } from "../components/game/feedback-message";
+import { useGameState } from "../hooks/use-game-state";
+import { useAudioContext } from "../components/audio-manager";
+import { generateChoicePool } from "../lib/game-logic";
 import type { Portal, GameLayout, GameItem } from "@shared/schema";
 
 interface GameProps {
@@ -34,14 +34,18 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
   } = useGameState();
 
   // Fetch layout data
-  const { data: layout, isLoading: layoutLoading } = useQuery<GameLayout>({
-    queryKey: ['/api/layouts', portal.layouts[0]],
-    enabled: !!portal,
+  const { data: layout, isLoading: layoutLoading, error: layoutError } = useQuery<GameLayout>({
+    queryKey: ['api/layouts', portal.layouts[0]],
+    enabled: !!portal?.layouts?.[0],
+    retry: 2,
+    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
   });
 
   // Fetch game items
-  const { data: allItems, isLoading: itemsLoading } = useQuery<GameItem[]>({
-    queryKey: ['/api/game-items'],
+  const { data: allItems, isLoading: itemsLoading, error: itemsError } = useQuery<GameItem[]>({
+    queryKey: ['api/game-items'],
+    retry: 2,
+    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
   });
 
   useEffect(() => {
@@ -110,11 +114,16 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
     );
   }
 
-  if (!layout) {
+  if (layoutError || itemsError || !layout) {
     return (
       <div className="fixed inset-0 z-30 flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
           <p className="text-destructive">Грешка при зареждане на нивото</p>
+          {(layoutError || itemsError) && (
+            <p className="text-sm text-muted-foreground">
+              {layoutError?.message || itemsError?.message}
+            </p>
+          )}
           <Button onClick={onBackToMenu}>Назад към менюто</Button>
         </div>
       </div>

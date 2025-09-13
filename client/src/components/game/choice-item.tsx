@@ -1,5 +1,5 @@
-import { cn } from "@/lib/utils";
-import type { GameItem } from "@shared/schema";
+import { cn } from "../ui/utils";
+import type { GameItem } from "../../../shared/schema";
 
 interface ChoiceItemProps {
   item: GameItem;

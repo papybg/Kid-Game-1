@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 function fixImports(dir) {
+  const srcDir = path.join(process.cwd(), 'client', 'src');
   const files = fs.readdirSync(dir);
   
   files.forEach(file => {
@@ -13,13 +14,27 @@ function fixImports(dir) {
     } else if (file.endsWith('.tsx') || file.endsWith('.ts')) {
       let content = fs.readFileSync(fullPath, 'utf8');
       
-      // Replace @/ imports with relative paths
-      const relativePath = path.relative(dir, path.join(process.cwd(), 'client', 'src')).replace(/\\/g, '/');
-      content = content.replace(/@\//g, `${relativePath ? relativePath + '/' : './'}`);
+      // Find all @/ imports
+      const matches = content.match(/@\/[^"']+/g);
+      if (matches) {
+        matches.forEach(match => {
+          const importPath = match.slice(2); // Remove @/
+          const targetPath = path.join(srcDir, importPath);
+          const relativePath = path.relative(dir, targetPath).replace(/\\/g, '/');
+          content = content.replace(match, relativePath.startsWith('.') ? relativePath : './' + relativePath);
+        });
+      }
       
-      // Replace @shared/ imports with relative paths
-      const sharedPath = path.relative(dir, path.join(process.cwd(), 'shared')).replace(/\\/g, '/');
-      content = content.replace(/@shared\//g, `${sharedPath ? sharedPath + '/' : '../shared/'}`);
+      // Replace @shared/ imports
+      const sharedMatches = content.match(/@shared\/[^"']+/g);
+      if (sharedMatches) {
+        sharedMatches.forEach(match => {
+          const importPath = match.slice(7); // Remove @shared/
+          const targetPath = path.join(process.cwd(), 'shared', importPath);
+          const relativePath = path.relative(dir, targetPath).replace(/\\/g, '/');
+          content = content.replace(match, relativePath);
+        });
+      }
       
       fs.writeFileSync(fullPath, content);
     }

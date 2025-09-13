@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { useAudio } from "@/hooks/use-audio";
+import { useAudio } from "../hooks/use-audio";
 
 type AudioContextType = {
   isInitialized: boolean;
@@ -18,17 +18,20 @@ type AudioContextType = {
 const AudioContext = createContext<AudioContextType | undefined>(undefined);
 
 // Audio file URLs - can be replaced with actual Bulgarian recordings
-const AUDIO_FILES = {
+const AUDIO_FILES: {
+  voices: { [key: string]: string | null };
+  animals: { [key: string]: string | null };
+} = {
   voices: {
-    bravo: 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DwuGwdBzCLz/LNfywFJHTBrdRmMQwVXrrm7qxdFwxAluDx0nkxBC15vefMHKv//+w=', // Simple beep tone as placeholder
-    tryAgain: 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DwuGwdBzCLz/LNfywFJHTBrdRmMQwVXbrm7qxdFwxAluDx0nkxBC15vefM8N2QQAoUXrTp66hVFA='
+    bravo: null, // Will use tone fallback
+    tryAgain: null // Will use tone fallback
   },
   animals: {
-    h: '/audio/animals/cat-meow.mp3', // Placeholder URLs
-    p: '/audio/animals/chicken-cluck.mp3',
-    s: '/audio/animals/bird-chirp.mp3',
-    r: '/audio/vehicles/engine.mp3',
-    i: '/audio/vehicles/train.mp3'
+    h: null, // Will use tone fallback
+    p: null,
+    s: null,
+    r: null,
+    i: null
   }
 };
 
@@ -70,10 +73,14 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     try {
       await initAudio();
       
-      // Preload voice files
+      // Preload voice files (skip null urls)
       const voiceFiles = Object.entries(AUDIO_FILES.voices);
       await Promise.all(voiceFiles.map(([key, url]) => {
         return new Promise<void>((resolve) => {
+          if (!url) {
+            resolve();
+            return;
+          }
           const audio = new Audio(url);
           audio.addEventListener('canplaythrough', () => resolve());
           audio.addEventListener('error', () => resolve()); // Continue even if file fails
@@ -82,7 +89,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       }));
       
       setIsInitialized(true);
-      console.log('Audio system initialized with voice support');
+      console.log('Audio system initialized with tone support');
     } catch (error) {
       console.error('Failed to initialize audio:', error);
     }
@@ -110,55 +117,27 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const playVoice = (type: 'bravo' | 'tryAgain') => {
     if (!isInitialized || !soundEnabled || !effectsEnabled) return;
 
-    const audioKey = `voice-${type}`;
-    const audio = audioElementsRef.current[audioKey];
-    
-    if (audio) {
-      audio.currentTime = 0; // Reset to beginning
-      audio.play().catch(error => {
-        console.warn('Failed to play voice audio:', error);
-        // Fallback to tone if voice file fails
-        if (type === 'bravo') {
-          playSound('success');
-        } else {
-          playSound('error');
-        }
-      });
+    // Always use tone fallback for now
+    if (type === 'bravo') {
+      playSound('success');
     } else {
-      // Fallback to tones
-      if (type === 'bravo') {
-        playSound('success');
-      } else {
-        playSound('error');
-      }
+      playSound('error');
     }
   };
 
   const playAnimalSound = (animalIndex: string) => {
     if (!isInitialized || !soundEnabled || !effectsEnabled) return;
 
-    const soundUrl = AUDIO_FILES.animals[animalIndex as keyof typeof AUDIO_FILES.animals];
-    if (soundUrl) {
-      // Create a new audio element for each play to allow overlapping sounds
-      const audio = new Audio(soundUrl);
-      audio.volume = 0.7;
-      audio.play().catch((error: unknown) => {
-        console.warn(`Failed to play animal sound for ${animalIndex}:`, error);
-        // Fallback to a pleasant tone
-        playTone(330, 0.3); // Pleasant frequency
-      });
-    } else {
-      // Fallback tone based on animal category
-      const frequencies = {
-        h: 330, // Home animals - warm tone
-        p: 280, // Farm animals - lower tone
-        s: 520, // Sky - higher tone
-        r: 200, // Road - deeper tone
-        i: 180  // Industrial - lowest tone
-      };
-      const freq = frequencies[animalIndex as keyof typeof frequencies] || 300;
-      playTone(freq, 0.4);
-    }
+    // Use tone-based sounds for now
+    const frequencies = {
+      h: 330, // Home animals - warm tone
+      p: 280, // Farm animals - lower tone
+      s: 520, // Sky - higher tone
+      r: 200, // Road - deeper tone
+      i: 180  // Industrial - lowest tone
+    };
+    const freq = frequencies[animalIndex as keyof typeof frequencies] || 300;
+    playTone(freq, 0.4);
   };
 
   return (
