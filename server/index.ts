@@ -14,20 +14,24 @@ app.use(express.urlencoded({ extended: false }));
 app.use((req, res, next) => {
   const allowedRaw = process.env.ALLOWED_ORIGINS ?? 'http://localhost:5173';
   const allowed = allowedRaw.split(',').map(s => s.trim()).filter(Boolean);
-  const origin = req.headers.origin || '';
+  const origin = (req.headers.origin || '').toString();
 
   // If allowlist contains '*' then allow everything.
-  const isAllowed = allowed.includes('*') || allowed.includes(origin) || (!origin && allowed.includes('http://localhost:5173'));
+  const allowAll = allowed.includes('*');
+  const isAllowed = allowAll || allowed.includes(origin) || (!origin && allowed.includes('http://localhost:5173'));
 
   if (isAllowed) {
-    res.header('Access-Control-Allow-Origin', origin || allowed[0] || '*');
-  } else {
-    // don't set Access-Control-Allow-Origin if not allowed
+    // If allowAll is true we must not send Access-Control-Allow-Credentials: true with a wildcard origin
+    // Browsers reject wildcard origin when credentials are included. If allowAll is set, send '*' as origin
+    // but don't set credentials header. If origin is specific, echo it and allow credentials.
+    res.header('Access-Control-Allow-Origin', origin || (allowAll ? '*' : allowed[0] || '*'));
+    if (!allowAll && origin) {
+      res.header('Access-Control-Allow-Credentials', 'true');
+    }
   }
 
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  res.header('Access-Control-Allow-Credentials', 'true');
 
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
