@@ -8,6 +8,8 @@ on:
 jobs:
   render-deploy:
     runs-on: ubuntu-latest
+    env:
+      NETLIFY_BUILD_HOOK: ${{ secrets.NETLIFY_BUILD_HOOK }}
     steps:
       - name: Trigger Render deploy
         id: trigger
@@ -68,9 +70,7 @@ jobs:
           exit 1
 
       - name: Trigger Netlify build hook
-        if: ${{ secrets.NETLIFY_BUILD_HOOK != '' }}
-        env:
-          NETLIFY_BUILD_HOOK: ${{ secrets.NETLIFY_BUILD_HOOK }}
+        if: ${{ env.NETLIFY_BUILD_HOOK != '' }}
         run: |
           echo "Triggering Netlify build hook"
           curl -s -X POST "$NETLIFY_BUILD_HOOK"
