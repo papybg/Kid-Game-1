@@ -29,7 +29,9 @@ jobs:
             -d '{}')
 
           echo "Response: $resp"
-          deploy_id=$(echo "$resp" | jq -r .id)
+          deploy_id=$(echo "$resp" | python3 -c "import sys,json
+data=json.load(sys.stdin)
+print(data.get('id',''))")
           if [ "$deploy_id" = "null" ] || [ -z "$deploy_id" ]; then
             echo "Failed to create deploy. Exiting with error.";
             echo "resp=$resp" >> $GITHUB_OUTPUT
@@ -54,7 +56,9 @@ jobs:
           state=""
           for i in {1..60}; do
             resp=$(curl -s "https://api.render.com/v1/services/$RENDER_SERVICE_ID/deploys/$deploy_id" -H "Authorization: Bearer $RENDER_API_KEY")
-            state=$(echo "$resp" | jq -r .state)
+            state=$(echo "$resp" | python3 -c "import sys,json
+data=json.load(sys.stdin)
+print(data.get('state',''))")
             echo "state=$state"
             if [ "$state" = "succeeded" ]; then
               echo "Deploy succeeded";
