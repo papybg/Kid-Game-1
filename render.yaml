@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: kidgame-backend
+    env: node
+    repo: $REPO # replace with your repo if you want to use this file for automatic creation
+    branch: main
+    rootDir: .
+    # Ensure devDependencies (vite, esbuild) are installed before running the build
+    # Some platforms install only production deps by default, so we explicitly
+    # install dev deps first to make vite available for the build step.
+    buildCommand: "npm install --include=dev && npm run build"
+    startCommand: "npm run start"
+    autoDeploy: true
+    instanceType: "starter"
+    envVars:
+      - key: ALLOWED_ORIGINS
+        value: "https://68c660dbd95386e3f66487fb--kid-game-1.netlify.app"
+      - key: NPM_CONFIG_PRODUCTION
+        value: "false"
+    healthCheckPath: "/api/portals"
