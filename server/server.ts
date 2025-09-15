@@ -15,7 +15,7 @@ app.use(cors({
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const isProd = process.env.NODE_ENV === "production";
-const port = parseInt(process.env.PORT || "3001", 10);
+const port = parseInt(process.env.PORT || "3005", 10);
 
 async function createDevServer() {
   const viteServer = await createViteServer({

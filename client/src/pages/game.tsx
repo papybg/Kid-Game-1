@@ -19,7 +19,7 @@ interface GameProps {
 
 export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const { soundEnabled, setSoundEnabled, playSound, playVoice, playAnimalSound } = useAudioContext();
+  const { soundEnabled, setSoundEnabled, playSound, playVoice, playAnimalSound, isAudioPlaying } = useAudioContext();
   
   const {
     gameState,
@@ -62,16 +62,18 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
     if (layout && allItems) {
       const choiceItems = generateChoicePool(layout.slots, allItems);
       startGame(portal, layout, choiceItems);
+      // Remove automatic start sound when game initializes
     }
   }, [layout, allItems, portal, startGame]);
 
-  // Play animal sound when item enters cell
+  // Play animal sound when item enters cell - only for correct choices
   useEffect(() => {
     const newItems = Object.keys(gameState.placedItems).filter(key => !previousPlacedItems[key]);
     newItems.forEach(key => {
       const item = gameState.placedItems[key];
       if (item) {
-        playAnimalSound(item.index);
+        // For correct choices, play animal sound immediately (queue will handle timing after voice)
+        playAnimalSound(item.name, 0); // No additional delay since voice already provides timing
       }
     });
     setPreviousPlacedItems({ ...gameState.placedItems });
@@ -87,29 +89,28 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
   }, [isGameComplete, gameState.score, timeElapsed, onWin, playSound]);
 
   const handleStartTurn = () => {
-    playSound('start');
+    // Remove automatic start sound - let the game flow naturally
     startTurn();
   };
 
   const handleChoiceClick = (item: GameItem) => {
-    if (gameState.usedItems.includes(item.id)) return;
+    if (gameState.usedItems.includes(item.id) || isAudioPlaying) return;
 
     playSound('click');
     const isValid = makeChoice(item);
-    
+
     if (isValid) {
       showFeedback('success', 'Браво!');
-      
-      // Play "BRAВО" voice
+
+      // Play "BRAВО" voice first, then animal sound will be queued automatically
       playVoice('bravo');
-      
+
     } else {
       showFeedback('error', 'Опитай пак!');
       playVoice('tryAgain');
+      // For wrong choices, don't play animal sound - just the voice feedback
     }
-  };
-
-  const toggleSound = () => {
+  };  const toggleSound = () => {
     setSoundEnabled(!soundEnabled);
   };
 
@@ -265,6 +266,7 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
                     key={item.id}
                     item={item}
                     isUsed={gameState.usedItems.includes(item.id)}
+                    isDisabled={isAudioPlaying}
                     onClick={handleChoiceClick}
                   />
                 ))}

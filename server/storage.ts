@@ -288,6 +288,16 @@ export class MemStorage implements IStorage {
 }
 
 // Use database storage if DATABASE_URL is available, otherwise use memory storage
-export const storage: IStorage = process.env.DATABASE_URL
-  ? new DbStorage()
-  : new MemStorage();
+let storageInstance: IStorage = new MemStorage(); // Default to memory storage
+
+if (process.env.DATABASE_URL) {
+  // Dynamically import DbStorage only when DATABASE_URL is available
+  import("./db-storage").then(({ DbStorage }) => {
+    storageInstance = new DbStorage();
+  }).catch((error) => {
+    console.warn("Failed to load database storage, falling back to memory storage:", error.message);
+    storageInstance = new MemStorage();
+  });
+}
+
+export const storage: IStorage = storageInstance;

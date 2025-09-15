@@ -12,7 +12,7 @@ export default function Welcome({ onEnterGame, onOpenSettings }: WelcomeProps) {
 
   const handleEnterGame = async () => {
     await initializeAudio();
-    playSound('start');
+    // Remove automatic start sound - let the game handle audio cues
     onEnterGame();
   };
 

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url'
 import tsconfigPaths from 'vite-tsconfig-paths'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-process.env.PORT = '3001';
+process.env.PORT = '3005';
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -23,7 +23,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:3005',
         changeOrigin: true
       }
     }
