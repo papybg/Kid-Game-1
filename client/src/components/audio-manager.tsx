@@ -23,15 +23,15 @@ const AUDIO_FILES: {
   animals: { [key: string]: string | null };
 } = {
   voices: {
-    bravo: null, // Will use tone fallback
-    tryAgain: null // Will use tone fallback
+    bravo: '/audio/voices/bravo.mp3', // Bulgarian "Браво!"
+    tryAgain: '/audio/voices/try-again.mp3' // Bulgarian "Опитай пак!"
   },
   animals: {
-    h: null, // Will use tone fallback
-    p: null,
-    s: null,
-    r: null,
-    i: null
+    h: '/audio/animals/home.mp3', // Home animals sound
+    p: '/audio/animals/farm.mp3', // Farm animals sound
+    s: '/audio/animals/sky.mp3', // Sky animals sound
+    r: '/audio/animals/road.mp3', // Road vehicles sound
+    i: '/audio/animals/industrial.mp3' // Industrial vehicles sound
   }
 };
 
@@ -87,6 +87,21 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
           audioElementsRef.current[`voice-${key}`] = audio;
         });
       }));
+
+      // Preload animal files
+      const animalFiles = Object.entries(AUDIO_FILES.animals);
+      await Promise.all(animalFiles.map(([key, url]) => {
+        return new Promise<void>((resolve) => {
+          if (!url) {
+            resolve();
+            return;
+          }
+          const audio = new Audio(url);
+          audio.addEventListener('canplaythrough', () => resolve());
+          audio.addEventListener('error', () => resolve()); // Continue even if file fails
+          audioElementsRef.current[`animal-${key}`] = audio;
+        });
+      }));
       
       setIsInitialized(true);
       console.log('Audio system initialized with tone support');
@@ -117,7 +132,25 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const playVoice = (type: 'bravo' | 'tryAgain') => {
     if (!isInitialized || !soundEnabled || !effectsEnabled) return;
 
-    // Always use tone fallback for now
+    const audioUrl = AUDIO_FILES.voices[type];
+    if (audioUrl) {
+      // Try to play audio file
+      const audio = audioElementsRef.current[`voice-${type}`];
+      if (audio) {
+        audio.currentTime = 0;
+        audio.play().catch(() => {
+          // Fallback to tone if audio fails
+          if (type === 'bravo') {
+            playSound('success');
+          } else {
+            playSound('error');
+          }
+        });
+        return;
+      }
+    }
+
+    // Fallback to tone
     if (type === 'bravo') {
       playSound('success');
     } else {
@@ -128,7 +161,26 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const playAnimalSound = (animalIndex: string) => {
     if (!isInitialized || !soundEnabled || !effectsEnabled) return;
 
-    // Use tone-based sounds for now
+    const audioUrl = AUDIO_FILES.animals[animalIndex as keyof typeof AUDIO_FILES.animals];
+    if (audioUrl) {
+      // Try to play audio file
+      const audio = audioElementsRef.current[`animal-${animalIndex}`];
+      if (audio) {
+        audio.currentTime = 0;
+        audio.play().catch(() => {
+          // Fallback to tone if audio fails
+          playToneForAnimal(animalIndex);
+        });
+        return;
+      }
+    }
+
+    // Fallback to tone
+    playToneForAnimal(animalIndex);
+  };
+
+  const playToneForAnimal = (animalIndex: string) => {
+    // Use tone-based sounds as fallback
     const frequencies = {
       h: 330, // Home animals - warm tone
       p: 280, // Farm animals - lower tone
