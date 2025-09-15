@@ -11,6 +11,9 @@ process.env.PORT = '3001';
 export default defineConfig({
   root: './client',
   plugins: [react(), tsconfigPaths()],
+  build: {
+    outDir: '../dist/public'
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'client/src'),
