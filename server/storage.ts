@@ -11,6 +11,7 @@ import {
   type InsertGameSettings,
 } from "../shared/schema";
 import { randomUUID } from "crypto";
+import { DbStorage } from "./db-storage";
 
 export interface IStorage {
   // Portals
@@ -286,4 +287,7 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Use database storage if DATABASE_URL is available, otherwise use memory storage
+export const storage: IStorage = process.env.DATABASE_URL
+  ? new DbStorage()
+  : new MemStorage();
