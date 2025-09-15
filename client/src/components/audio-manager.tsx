@@ -17,21 +17,21 @@ type AudioContextType = {
 
 const AudioContext = createContext<AudioContextType | undefined>(undefined);
 
-// Audio file URLs - can be replaced with actual Bulgarian recordings
+// Audio file URLs - Bulgarian audio files from the repository
 const AUDIO_FILES: {
   voices: { [key: string]: string | null };
   animals: { [key: string]: string | null };
 } = {
   voices: {
-    bravo: '/audio/voices/bravo.mp3', // Bulgarian "Браво!"
-    tryAgain: '/audio/voices/try-again.mp3' // Bulgarian "Опитай пак!"
+    bravo: '/audio/voices/bravo.wav',
+    tryAgain: '/audio/voices/try-again.wav'
   },
   animals: {
-    h: '/audio/animals/home.mp3', // Home animals sound
-    p: '/audio/animals/farm.mp3', // Farm animals sound
-    s: '/audio/animals/sky.mp3', // Sky animals sound
-    r: '/audio/animals/road.mp3', // Road vehicles sound
-    i: '/audio/animals/industrial.mp3' // Industrial vehicles sound
+    h: '/audio/animals/cat.mp3',        // Home animals - cat
+    p: '/audio/animals/chicken.mp3',    // Farm animals - chicken
+    s: '/audio/animals/crow.mp3',       // Sky animals - crow
+    r: '/audio/vehicles/bus.mp3',       // Road vehicles - bus
+    i: '/audio/vehicles/train.mp3'      // Industrial vehicles - train
   }
 };
 
