@@ -56,12 +56,26 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const [previousPlacedItems, setPreviousPlacedItems] = useState<Record<string, GameItem>>({});
+
   useEffect(() => {
     if (layout && allItems) {
       const choiceItems = generateChoicePool(layout.slots, allItems);
       startGame(portal, layout, choiceItems);
     }
   }, [layout, allItems, portal, startGame]);
+
+  // Play animal sound when item enters cell
+  useEffect(() => {
+    const newItems = Object.keys(gameState.placedItems).filter(key => !previousPlacedItems[key]);
+    newItems.forEach(key => {
+      const item = gameState.placedItems[key];
+      if (item) {
+        playAnimalSound(item.index);
+      }
+    });
+    setPreviousPlacedItems({ ...gameState.placedItems });
+  }, [gameState.placedItems, playAnimalSound]);
 
   useEffect(() => {
     if (isGameComplete) {
@@ -86,13 +100,9 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
     if (isValid) {
       showFeedback('success', 'Браво!');
       
-      // Play "BRAВО" voice first, then animal sound
+      // Play "BRAВО" voice
       playVoice('bravo');
-      setTimeout(() => {
-        playAnimalSound(item.index);
-      }, 800); // Delay animal sound to play after "BRAVO"
       
-      // No need to call nextSlot() - the new logic handles completion automatically
     } else {
       showFeedback('error', 'Опитай пак!');
       playVoice('tryAgain');
