@@ -14,7 +14,7 @@ services:
     instanceType: "starter"
     envVars:
       - key: ALLOWED_ORIGINS
-        value: "https://68c660dbd95386e3f66487fb--kid-game-1.netlify.app"
+        value: "https://68c7746e7cfb46000728282d--kid-game-1.netlify.app"
       - key: NPM_CONFIG_PRODUCTION
         value: "false"
     healthCheckPath: "/api/portals"
