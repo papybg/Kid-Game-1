@@ -88,7 +88,15 @@ app.use((req, res, next) => {
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
-    serveStatic(app);
+    try {
+      serveStatic(app);
+    } catch (err) {
+      // Do not crash the process if the client build is missing. Start the API only.
+      console.warn(
+        "Warning: serveStatic failed — starting API without client static files.",
+        err instanceof Error ? err.message : err,
+      );
+    }
   }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT

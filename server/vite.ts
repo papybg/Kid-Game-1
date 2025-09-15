@@ -71,12 +71,25 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(__dirname, "public");
+  // Try several likely locations for the client build. Render and local builds
+  // may place the files in slightly different paths, so accept the first
+  // one that exists.
+  const candidates = [
+    path.resolve(__dirname, "public"), // default when building to dist/public
+    path.resolve(process.cwd(), "dist", "public"), // explicit project-root dist/public
+    path.resolve(__dirname, "..", "client", "dist"), // client/dist
+    path.resolve(process.cwd(), "client", "dist"), // alternate client/dist
+  ];
 
-  if (!fs.existsSync(distPath)) {
-    throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`,
+  const distPath = candidates.find((p) => fs.existsSync(p));
+
+  if (!distPath) {
+    // If no client build is present, log a warning and continue running the API only.
+    // This prevents a hard crash on Render so that API endpoints remain available.
+    console.warn(
+      `Warning: no client build found. Checked: ${candidates.join(", ")}. Starting API only.`,
     );
+    return;
   }
 
   app.use(express.static(distPath));
