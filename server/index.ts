@@ -18,7 +18,7 @@ app.use((req, res, next) => {
 
   // If allowlist contains '*' then allow everything.
   const allowAll = allowed.includes('*');
-  const isAllowed = allowAll || allowed.includes(origin) || (!origin && allowed.includes('http://localhost:5173'));
+  const isAllowed = allowAll || allowed.includes(origin) || (!origin && allowed.includes('http://localhost:5173')) || origin?.endsWith('.netlify.app');
 
   if (isAllowed) {
     // If allowAll is true we must not send Access-Control-Allow-Credentials: true with a wildcard origin
