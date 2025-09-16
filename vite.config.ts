@@ -21,9 +21,12 @@ export default defineConfig({
     }
   },
   server: {
+    host: true,
+    port: process.env.VITE_PORT ? parseInt(process.env.VITE_PORT) : 8080,
+    strictPort: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:3005',
+        target: `http://localhost:${process.env.PORT || 3005}`,
         changeOrigin: true
       }
     }

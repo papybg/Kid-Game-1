@@ -17,22 +17,24 @@ export function ChoiceItem({ item, isUsed, isDisabled, onClick, className }: Cho
   };
 
   return (
-    <img
-      src={item.image}
-      alt={item.name}
-      className={cn(
-        "choice-item w-16 h-16 bg-white dark:bg-card rounded-xl object-cover border-2 border-white/50 dark:border-card-foreground/20 hover:border-yellow-400 flex-shrink-0 transition-all duration-200",
-        {
-          "used": isUsed,
-          "opacity-50 cursor-not-allowed": isDisabled,
-          "hover:border-yellow-400": !isUsed && !isDisabled,
-        },
-        className
-      )}
-      onClick={handleClick}
-      data-testid={`choice-item-${item.id}`}
-      data-item-id={item.id}
-      data-item-index={item.index}
-    />
+    <div className="p-2">
+      <img
+        src={item.image}
+        alt={item.name}
+        className={cn(
+          "choice-item w-16 h-16 object-contain flex-shrink-0 transition-all duration-200 cursor-pointer",
+          {
+            "used": isUsed,
+            "opacity-50 cursor-not-allowed": isDisabled,
+            "hover:scale-110": !isUsed && !isDisabled,
+          },
+          className
+        )}
+        onClick={handleClick}
+        data-testid={`choice-item-${item.id}`}
+        data-item-id={item.id}
+        data-item-index={item.index}
+      />
+    </div>
   );
 }

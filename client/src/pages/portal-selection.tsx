@@ -3,7 +3,7 @@ import { ArrowLeft, Moon, Sun, Star, PuzzleIcon } from "lucide-react";
 import { useTheme } from "../components/theme-provider";
 import { useQuery } from "@tanstack/react-query";
 import { LoadingSpinner } from "../components/ui/loading-spinner";
-import type { Portal } from "../../shared/schema";
+import type { Portal } from "@shared/schema";
 
 interface PortalSelectionProps {
   onBackToWelcome: () => void;

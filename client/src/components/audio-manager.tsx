@@ -41,7 +41,7 @@ const ITEM_AUDIO_MAP: { [itemName: string]: string } = {
   'Котка': '/audio/animals/cat.mp3',
   'Куче': '/audio/animals/dog.mp3',
   'Кокошка': '/audio/animals/chicken.mp3',
-  'Крава': '/audio/animals/elephant.mp3', // Using elephant as cow alternative
+  'Крава': '/audio/animals/cow.mp3', // Using cow.mp3 for cow sound
   'Врана': '/audio/animals/crow.mp3',
   'Влак': '/audio/vehicles/train.mp3',
   'Автобус': '/audio/vehicles/bus.mp3',
@@ -63,12 +63,18 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   
   const { initializeAudio: initAudio, playTone } = useAudio();
   
-  // Audio queue system
-  const audioQueueRef = useRef<Array<{ type: 'voice' | 'animal' | 'sound', data: any, delay?: number }>>([]);
-  const isProcessingQueueRef = useRef(false);
-  
-  // Store preloaded audio elements
-  const audioElementsRef = useRef<Record<string, HTMLAudioElement>>({});
+  // Track currently playing audio elements to prevent overlap
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Stop any currently playing audio
+  const stopCurrentAudio = () => {
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current.currentTime = 0;
+      currentAudioRef.current = null;
+    }
+    setIsAudioPlaying(false);
+  };
 
   useEffect(() => {
     // Load settings from localStorage
@@ -96,221 +102,135 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const initializeAudio = async () => {
     try {
       await initAudio();
-      
-      // Preload voice files (skip null urls)
-      const voiceFiles = Object.entries(AUDIO_FILES.voices);
-      await Promise.all(voiceFiles.map(([key, url]) => {
-        return new Promise<void>((resolve) => {
-          if (!url) {
-            resolve();
-            return;
-          }
-          const audio = new Audio(url);
-          audio.addEventListener('canplaythrough', () => resolve());
-          audio.addEventListener('error', () => resolve()); // Continue even if file fails
-          audioElementsRef.current[`voice-${key}`] = audio;
-        });
-      }));
-
-      // Preload animal files
-      const animalFiles = Object.entries(AUDIO_FILES.animals);
-      await Promise.all(animalFiles.map(([key, url]) => {
-        return new Promise<void>((resolve) => {
-          if (!url) {
-            resolve();
-            return;
-          }
-          const audio = new Audio(url);
-          audio.addEventListener('canplaythrough', () => resolve());
-          audio.addEventListener('error', () => resolve()); // Continue even if file fails
-          audioElementsRef.current[`animal-${key}`] = audio;
-        });
-      }));
-
-      // Preload specific item audio files
-      const itemFiles = Object.entries(ITEM_AUDIO_MAP);
-      await Promise.all(itemFiles.map(([key, url]) => {
-        return new Promise<void>((resolve) => {
-          const audio = new Audio(url);
-          audio.addEventListener('canplaythrough', () => resolve());
-          audio.addEventListener('error', () => resolve()); // Continue even if file fails
-          audioElementsRef.current[`item-${key}`] = audio;
-        });
-      }));
-      
       setIsInitialized(true);
-      console.log('Audio system initialized with tone support');
+      console.log('Audio system initialized');
     } catch (error) {
       console.error('Failed to initialize audio:', error);
     }
   };
 
-  // Audio queue processing
-  const processAudioQueue = async () => {
-    if (isProcessingQueueRef.current || audioQueueRef.current.length === 0) return;
+  // Remove all complex queue and preloading functions
+  const playSound = (type: 'success' | 'error' | 'click' | 'start' | 'win') => {
+    if (!isInitialized || !soundEnabled || !effectsEnabled) return;
     
-    isProcessingQueueRef.current = true;
-    
-    while (audioQueueRef.current.length > 0) {
-      const audioItem = audioQueueRef.current.shift();
-      if (!audioItem) continue;
-      
-      setIsAudioPlaying(true);
-      
-      // Add delay if specified
-      if (audioItem.delay) {
-        await new Promise(resolve => setTimeout(resolve, audioItem.delay));
-      }
-      
-      // Play the audio
-      if (audioItem.type === 'voice') {
-        await playVoiceInternal(audioItem.data);
-      } else if (audioItem.type === 'animal') {
-        await playAnimalSoundInternal(audioItem.data);
-      } else if (audioItem.type === 'sound') {
-        await playSoundInternal(audioItem.data);
-      }
-      
-      // Small delay between different audio types
-      await new Promise(resolve => setTimeout(resolve, 100));
+    const frequencies = {
+      success: [440, 554, 659],
+      error: [220, 233, 246], 
+      click: [800],
+      start: [261, 329, 392],
+      win: [523, 659, 784, 1047],
+    };
+
+    const freqs = frequencies[type];
+    if (freqs) {
+      freqs.forEach((freq, index) => {
+        setTimeout(() => playTone(freq, 0.2), index * 100);
+      });
     }
-    
-    setIsAudioPlaying(false);
-    isProcessingQueueRef.current = false;
   };
 
-  const addToAudioQueue = (type: 'voice' | 'animal' | 'sound', data: any, delay?: number) => {
-    audioQueueRef.current.push({ type, data, delay });
-    processAudioQueue();
-  };
+  const playVoice = (type: 'bravo' | 'tryAgain') => {
+    if (!isInitialized || !soundEnabled || !effectsEnabled) return;
 
-  // Internal play functions that return promises
-  const playVoiceInternal = (type: 'bravo' | 'tryAgain'): Promise<void> => {
-    return new Promise((resolve) => {
-      const audioUrl = AUDIO_FILES.voices[type];
-      if (audioUrl) {
-        const audio = audioElementsRef.current[`voice-${type}`];
-        if (audio) {
-          audio.currentTime = 0;
-          audio.play().catch(() => {
-            // Fallback to tone
-            if (type === 'bravo') {
-              playSound('success');
-            } else {
-              playSound('error');
-            }
-            resolve();
-          });
-          
-          audio.addEventListener('ended', () => resolve(), { once: true });
-          audio.addEventListener('error', () => resolve(), { once: true });
-          return;
+    // Stop any currently playing audio first
+    stopCurrentAudio();
+
+    // Simple direct audio playback
+    const audioUrl = AUDIO_FILES.voices[type];
+    if (audioUrl) {
+      const audio = new Audio(audioUrl);
+      audio.volume = 0.9; // Increased volume
+      currentAudioRef.current = audio;
+      setIsAudioPlaying(true);
+
+      audio.addEventListener('loadstart', () => {
+        console.log(`Loading voice: ${type}`);
+      });
+
+      audio.addEventListener('canplay', () => {
+        console.log(`Voice ${type} ready to play, duration: ${audio.duration}s`);
+      });
+
+      audio.play().then(() => {
+        console.log(`Playing voice: ${type}`);
+      }).catch((error) => {
+        console.error(`Failed to play voice ${type}:`, error);
+        // Simple tone fallback
+        if (type === 'bravo') {
+          playSound('success');
+        } else {
+          playSound('error');
         }
-      }
-      
-      // Fallback to tone
+        setIsAudioPlaying(false);
+      });
+
+      audio.addEventListener('ended', () => {
+        console.log(`Voice ${type} ended`);
+        setIsAudioPlaying(false);
+        currentAudioRef.current = null;
+      });
+
+      audio.addEventListener('error', (e) => {
+        console.error(`Voice ${type} error:`, e);
+        setIsAudioPlaying(false);
+        currentAudioRef.current = null;
+      });
+    } else {
+      console.warn(`No audio URL for voice: ${type}`);
+      // Simple tone fallback
       if (type === 'bravo') {
         playSound('success');
       } else {
         playSound('error');
       }
-      resolve();
-    });
-  };
-
-  const playAnimalSoundInternal = (itemNameOrIndex: string): Promise<void> => {
-    return new Promise((resolve) => {
-      // First check if this is a specific item name
-      if (ITEM_AUDIO_MAP[itemNameOrIndex]) {
-        const audio = audioElementsRef.current[`item-${itemNameOrIndex}`];
-        if (audio) {
-          audio.currentTime = 0;
-          audio.play().catch(() => {
-            playIndexBasedAudioInternal(itemNameOrIndex, resolve);
-          });
-          
-          audio.addEventListener('ended', () => resolve(), { once: true });
-          audio.addEventListener('error', () => resolve(), { once: true });
-          return;
-        }
-      }
+    }
+  };  const playAnimalSound = (itemNameOrIndex: string, delay?: number) => {
+    if (!isInitialized || !soundEnabled || !effectsEnabled) return;
+    
+    const playAfterDelay = () => {
+      // Stop any currently playing audio first
+      stopCurrentAudio();
       
-      // Fallback to index-based audio
-      playIndexBasedAudioInternal(itemNameOrIndex, resolve);
-    });
-  };
-
-  const playIndexBasedAudioInternal = (animalIndex: string, resolve: () => void) => {
-    const audioUrl = AUDIO_FILES.animals[animalIndex as keyof typeof AUDIO_FILES.animals];
-    if (audioUrl) {
-      const audio = audioElementsRef.current[`animal-${animalIndex}`];
-      if (audio) {
-        audio.currentTime = 0;
+      // Simple direct audio playback without queue system
+      const audioUrl = ITEM_AUDIO_MAP[itemNameOrIndex] || AUDIO_FILES.animals[itemNameOrIndex as keyof typeof AUDIO_FILES.animals];
+      
+      if (audioUrl) {
+        const audio = new Audio(audioUrl);
+        audio.volume = 0.7;
+        currentAudioRef.current = audio;
+        setIsAudioPlaying(true);
+        
         audio.play().catch(() => {
-          playToneForAnimal(animalIndex);
-          resolve();
+          // Simple tone fallback
+          playTone(300, 0.3);
+          setIsAudioPlaying(false);
         });
         
-        audio.addEventListener('ended', () => resolve(), { once: true });
-        audio.addEventListener('error', () => resolve(), { once: true });
-        return;
-      }
-    }
-    
-    // Final fallback to tone
-    playToneForAnimal(animalIndex);
-    resolve();
-  };
-
-  const playSoundInternal = (type: 'success' | 'error' | 'click' | 'start' | 'win'): Promise<void> => {
-    return new Promise((resolve) => {
-      const frequencies = {
-        success: [440, 554, 659], // A, C#, E (happy chord)
-        error: [220, 233, 246], // A, A#, B (dissonant)
-        click: [800], // High click
-        start: [261, 329, 392], // C, E, G (major chord)
-        win: [523, 659, 784, 1047], // C, E, G, C (victory fanfare)
-      };
-
-      const freqs = frequencies[type];
-      if (freqs && Array.isArray(freqs)) {
-        freqs.forEach((freq, index) => {
-          setTimeout(() => playTone(freq, 0.2), index * 100);
+        audio.addEventListener('ended', () => {
+          setIsAudioPlaying(false);
+          currentAudioRef.current = null;
         });
-        // Resolve after the longest tone duration
-        setTimeout(resolve, freqs.length * 100 + 200);
+        
+        audio.addEventListener('error', () => {
+          setIsAudioPlaying(false);
+          currentAudioRef.current = null;
+        });
       } else {
-        resolve();
+        // Simple tone fallback
+        playTone(300, 0.3);
       }
-    });
-  };
+    };
 
-  const playSound = (type: 'success' | 'error' | 'click' | 'start' | 'win') => {
-    if (!isInitialized || !soundEnabled || !effectsEnabled) return;
-    addToAudioQueue('sound', type);
-  };
-
-  const playVoice = (type: 'bravo' | 'tryAgain') => {
-    if (!isInitialized || !soundEnabled || !effectsEnabled) return;
-    addToAudioQueue('voice', type);
-  };
-
-  const playAnimalSound = (itemNameOrIndex: string, delay?: number) => {
-    if (!isInitialized || !soundEnabled || !effectsEnabled) return;
-    addToAudioQueue('animal', itemNameOrIndex, delay || 1000); // Reduced from 2000ms to 1000ms
+    if (delay && delay > 0) {
+      setTimeout(playAfterDelay, delay);
+    } else {
+      playAfterDelay();
+    }
   };
 
   const playToneForAnimal = (animalIndex: string) => {
-    // Use tone-based sounds as fallback
-    const frequencies = {
-      h: 330, // Home animals - warm tone
-      p: 280, // Farm animals - lower tone
-      s: 520, // Sky - higher tone
-      r: 200, // Road - deeper tone
-      i: 180  // Industrial - lowest tone
-    };
-    const freq = frequencies[animalIndex as keyof typeof frequencies] || 300;
-    playTone(freq, 0.4);
+    // Simple tone fallback
+    playTone(300, 0.3);
   };
 
   return (

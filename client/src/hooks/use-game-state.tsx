@@ -25,6 +25,7 @@ const initialGameState: GameState = loadSavedState() || {
   placedItems: {},
   score: 0,
   startTime: 0,
+  activeSlotIndex: 0, // Нова променлива за активната клетка
 };
 
 const initialFeedback: FeedbackMessage = {
@@ -38,17 +39,21 @@ export function useGameState() {
   const [feedback, setFeedback] = useState<FeedbackMessage>(initialFeedback);
 
   const startGame = useCallback((portal: Portal, layout: GameLayout, items: GameItem[]) => {
+    // Shuffle the slots to randomize their order
+    const shuffledSlots = [...layout.slots].sort(() => Math.random() - 0.5);
+    
     const newState = {
       currentPortal: portal,
       currentLayout: layout,
       isPlaying: false,
       isPaused: false,
-      availableSlots: [...layout.slots],
+      availableSlots: shuffledSlots,
       choiceItems: items,
       usedItems: [],
       placedItems: {},
       score: 0,
       startTime: Date.now(),
+      activeSlotIndex: 0,
     };
     setGameState(newState);
     try {
@@ -65,25 +70,25 @@ export function useGameState() {
     }));
   }, []);
 
-  const makeChoice = useCallback((item: GameItem): boolean => {
-    const { availableSlots } = gameState;
+  const makeChoice = useCallback((item: GameItem, activeSlot: GameSlot | null, removeSlotImmediately: boolean = true): boolean => {
+    if (!activeSlot) return false;
     
-    // Find a matching slot for this item (item-first logic)
-    const matchingSlot = availableSlots.find(slot => slot.index.includes(item.index));
-    
-    if (!matchingSlot) return false;
+    // Check if the item matches the ACTIVE slot only (not any available slot)
+    if (!activeSlot.index.includes(item.index)) {
+      return false; // Item doesn't match the active slot
+    }
 
     // Generate slot ID for tracking placement
-    const slotId = `${matchingSlot.position.top}-${matchingSlot.position.left}`;
+    const slotId = `${activeSlot.position.top}-${activeSlot.position.left}`;
 
     setGameState(prev => {
       const newState = {
         ...prev,
         usedItems: [...prev.usedItems, item.id],
-        availableSlots: prev.availableSlots.filter(slot => slot !== matchingSlot),
+        availableSlots: removeSlotImmediately ? prev.availableSlots.filter(slot => slot !== activeSlot) : prev.availableSlots,
         placedItems: { ...prev.placedItems, [slotId]: item },
         score: prev.score + 10,
-        isPlaying: prev.availableSlots.length > 1, // Keep playing if more than 1 slot (current one will be removed)
+        isPlaying: removeSlotImmediately ? prev.availableSlots.length > 1 : true, // Keep playing if more than 1 slot (current one will be removed)
       };
       
       try {
@@ -96,9 +101,67 @@ export function useGameState() {
     });
 
     return true;
-  }, [gameState]);
+  }, []);
 
-  // Removed nextSlot - no longer needed with item-first logic
+  const nextSlot = useCallback(() => {
+    setGameState(prev => {
+      if (prev.availableSlots.length === 0) return prev;
+      
+      const nextIndex = (prev.activeSlotIndex + 1) % prev.availableSlots.length;
+      const newState = {
+        ...prev,
+        activeSlotIndex: nextIndex,
+      };
+      
+      try {
+        localStorage.setItem('gameState', JSON.stringify(newState));
+      } catch (e) {
+        console.error('Failed to save game state:', e);
+      }
+      
+      return newState;
+    });
+  }, []);
+
+  const previousSlot = useCallback(() => {
+    setGameState(prev => {
+      if (prev.availableSlots.length === 0) return prev;
+      
+      const prevIndex = prev.activeSlotIndex === 0 
+        ? prev.availableSlots.length - 1 
+        : prev.activeSlotIndex - 1;
+      const newState = {
+        ...prev,
+        activeSlotIndex: prevIndex,
+      };
+      
+      try {
+        localStorage.setItem('gameState', JSON.stringify(newState));
+      } catch (e) {
+        console.error('Failed to save game state:', e);
+      }
+      
+      return newState;
+    });
+  }, []);
+
+  const removeCurrentSlot = useCallback((slotToRemove: GameSlot) => {
+    setGameState(prev => {
+      const newState = {
+        ...prev,
+        availableSlots: prev.availableSlots.filter(slot => slot !== slotToRemove),
+        isPlaying: prev.availableSlots.length > 1,
+      };
+      
+      try {
+        localStorage.setItem('gameState', JSON.stringify(newState));
+      } catch (e) {
+        console.error('Failed to save game state:', e);
+      }
+      
+      return newState;
+    });
+  }, []);
 
   const showFeedback = useCallback((type: 'success' | 'error', message: string) => {
     setFeedback({ type, message, isVisible: true });
@@ -129,10 +192,14 @@ export function useGameState() {
     startGame,
     startTurn,
     makeChoice,
+    nextSlot,
+    previousSlot,
+    removeCurrentSlot,
     showFeedback,
     pauseGame,
     resetGame,
     isGameComplete,
     timeElapsed,
+    activeSlotIndex: gameState.activeSlotIndex,
   };
 }

@@ -99,6 +99,7 @@ export interface GameState {
   placedItems: Record<string, GameItem>; // Key: slotId, Value: placed item
   score: number;
   startTime: number;
+  activeSlotIndex: number;
 }
 
 export interface FeedbackMessage {

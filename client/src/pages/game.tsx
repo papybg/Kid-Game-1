@@ -14,11 +14,12 @@ import type { Portal, GameLayout, GameItem } from "@shared/schema";
 interface GameProps {
   portal: Portal;
   onBackToMenu: () => void;
-  onWin: (score: number, time: number) => void;
+  onWin: () => void;
 }
 
 export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [previousPlacedItems, setPreviousPlacedItems] = useState<Record<string, GameItem>>({});
   const { soundEnabled, setSoundEnabled, playSound, playVoice, playAnimalSound, isAudioPlaying } = useAudioContext();
   
   const {
@@ -31,6 +32,7 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
     pauseGame,
     isGameComplete,
     timeElapsed,
+    removeCurrentSlot,
   } = useGameState();
 
   // Fetch layout data
@@ -56,7 +58,10 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const [previousPlacedItems, setPreviousPlacedItems] = useState<Record<string, GameItem>>({});
+  const activeSlot = gameState.availableSlots.length > 0 ? gameState.availableSlots[0] : null;
+  const filteredChoiceItems = gameState.isPlaying && activeSlot 
+    ? gameState.choiceItems.filter(item => activeSlot.index.includes(item.index))
+    : [];
 
   useEffect(() => {
     if (layout && allItems) {
@@ -72,19 +77,19 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
     newItems.forEach(key => {
       const item = gameState.placedItems[key];
       if (item) {
-        // For correct choices, play animal sound immediately (queue will handle timing after voice)
-        playAnimalSound(item.name, 0); // No additional delay since voice already provides timing
+        // Animal sound is already handled in handleChoiceClick, no need to duplicate
+        // playAnimalSound(item.name, 1000); // Removed to prevent audio overlap
       }
     });
     setPreviousPlacedItems({ ...gameState.placedItems });
-  }, [gameState.placedItems, playAnimalSound]);
+  }, [gameState.placedItems]);
 
   useEffect(() => {
     if (isGameComplete) {
       playSound('win');
       setTimeout(() => {
-        onWin(gameState.score, timeElapsed);
-      }, 1500);
+        onWin();
+      }, 4500); // Increased from 1500ms to 4500ms to allow time for all sounds
     }
   }, [isGameComplete, gameState.score, timeElapsed, onWin, playSound]);
 
@@ -94,16 +99,24 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
   };
 
   const handleChoiceClick = (item: GameItem) => {
-    if (gameState.usedItems.includes(item.id) || isAudioPlaying) return;
+    if (gameState.usedItems.includes(item.id) || isAudioPlaying || !activeSlot) return;
 
     playSound('click');
-    const isValid = makeChoice(item);
+    const isValid = makeChoice(item, activeSlot, false); // Don't remove slot immediately
 
     if (isValid) {
       showFeedback('success', 'Браво!');
 
-      // Play "BRAВО" voice first, then animal sound will be queued automatically
+      // Play "BRAВО" voice first, then animal sound after 2 seconds delay (reduced from 3)
       playVoice('bravo');
+      setTimeout(() => {
+        playAnimalSound(item.name);
+        // Wait for animal sound to finish before moving to next slot
+        setTimeout(() => {
+          // Remove the current slot and move to next one
+          removeCurrentSlot(activeSlot);
+        }, 2500); // Wait 2.5 seconds for animal sound to finish
+      }, 2000); // Reduced from 3000 to 2000
 
     } else {
       showFeedback('error', 'Опитай пак!');
@@ -148,7 +161,7 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
       {/* Game Background */}
       <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-500"
-        style={{ backgroundImage: `url('${backgroundUrl}')` }}
+        style={backgroundUrl ? { backgroundImage: `url('${backgroundUrl}')` } : {}}
       >
         <div className="absolute inset-0 bg-black/20"></div>
       </div>
@@ -170,7 +183,7 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
             <h1 className="font-display font-bold text-xl md:text-2xl">{portal.name}</h1>
             <div className="text-sm bg-white/20 backdrop-blur-sm rounded-full px-4 py-1 mt-2 inline-block">
               {gameState.isPlaying
-                ? "Избери предмет – ще отиде на мястото си!"
+                ? "Какво ще поставиш тук"
                 : "Натисни СТАРТ за да започнеш!"
               }
             </div>
@@ -201,18 +214,15 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
       
       {/* Game Slots Overlay */}
       <div className="absolute inset-0 z-10 pointer-events-none">
-        {/* Available slots (empty) */}
-        {gameState.availableSlots.map((slot, index) => {
-          const slotId = `${slot.position.top}-${slot.position.left}`;
-          return (
-            <GameSlotComponent
-              key={slotId}
-              slot={slot}
-              isActive={false} // No more active slot highlighting
-              className="pointer-events-auto"
-            />
-          );
-        })}
+        {/* Active slot only - show only when game is playing */}
+        {gameState.isPlaying && activeSlot && (
+          <GameSlotComponent
+            key={`${activeSlot.position.top}-${activeSlot.position.left}`}
+            slot={activeSlot}
+            isActive={true}
+            className="pointer-events-auto"
+          />
+        )}
         
         {/* Placed items (filled slots) */}
         {layout && Object.entries(gameState.placedItems).map(([slotId, item]) => {
@@ -238,7 +248,7 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
       <FeedbackMessageComponent feedback={feedback} />
       
       {/* Floating START Button */}
-      {!gameState.isPlaying && (
+      {!gameState.isPlaying && !isGameComplete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
           <div className="pointer-events-auto">
             <Button
@@ -260,6 +270,13 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
         {gameState.isPlaying && (
           <div className="max-w-6xl mx-auto">
             <div className="bg-black/30 backdrop-blur-sm rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-white text-sm font-medium">
+                  Избери правилния предмет
+                </span>
+                <div className="flex gap-2">
+                </div>
+              </div>
               <div className="choice-zone flex gap-3 overflow-x-auto pb-2">
                 {gameState.choiceItems.map((item) => (
                   <ChoiceItem
@@ -280,8 +297,8 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
       <div className="absolute top-20 left-4 right-4 z-20">
         <div className="max-w-sm mx-auto bg-black/30 backdrop-blur-sm rounded-full p-2">
           <div className="flex items-center justify-between text-white text-sm mb-1">
-            <span>Прогрес</span>
-            <span>{layout.slots.length - gameState.availableSlots.length}/{layout.slots.length}</span>
+            <span></span>
+            <span></span>
           </div>
           <div className="w-full bg-white/20 rounded-full h-2">
             <div

@@ -1,0 +1,11 @@
+{
+  "name": "kidgame1-client",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

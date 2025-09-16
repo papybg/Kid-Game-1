@@ -1,5 +1,5 @@
 import { cn } from "../ui/utils";
-import type { GameSlot, GameItem } from "../../../shared/schema";
+import type { GameSlot, GameItem } from "@shared/schema";
 
 interface GameSlotProps {
   slot: GameSlot;
@@ -16,11 +16,16 @@ export function GameSlotComponent({ slot, isActive, isCompleted, placedItem, cla
   return (
     <div
       className={cn(
-        "game-slot absolute border-2 border-dashed border-white/50 rounded-full bg-white/10 backdrop-blur-sm",
+        "game-slot absolute rounded-full transition-all duration-200",
         {
-          "border-yellow-400 border-solid animate-pulse": isActive && !hasPlacedItem,
-          "border-green-400 border-solid bg-green-400/20": hasPlacedItem,
-          "opacity-50": isCompleted,
+          // Default visible outline - only when no item is placed
+          "bg-white/6 backdrop-blur-sm border-4 border-solid border-white/80": !isActive && !hasPlacedItem && !isCompleted,
+          // Active slot: brighter ring + glow - only when no item is placed
+          "bg-white/6 backdrop-blur-sm border-4 border-yellow-400 ring-4 ring-yellow-300/60 shadow-[0_8px_20px_rgba(250,204,21,0.18)]": isActive && !hasPlacedItem,
+          // Filled slot: no border, no background - just the image
+          "border-0 bg-transparent": hasPlacedItem,
+          // Completed: slightly dimmed
+          "opacity-70": isCompleted,
         },
         className
       )}
@@ -34,11 +39,11 @@ export function GameSlotComponent({ slot, isActive, isCompleted, placedItem, cla
       data-testid={`game-slot-${slot.index.join('-')}`}
     >
       {placedItem && (
-        <div className="absolute inset-1 rounded-full overflow-hidden">
+        <div className="absolute inset-0">
           <img
             src={placedItem.image}
             alt={placedItem.name}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-contain"
             data-testid={`placed-item-${placedItem.id}`}
           />
         </div>

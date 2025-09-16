@@ -68,7 +68,7 @@ export class MemStorage implements IStorage {
       {
         id: 1,
         name: "Котка",
-        image: "https://raw.githubusercontent.com/papybg/Kade-da-me-otkriesh/main/images/h/cat.jpg",
+        image: "/images/cat.jpg",
         index: "h",
         category: "домашни",
         createdAt: new Date(),
@@ -76,7 +76,7 @@ export class MemStorage implements IStorage {
       {
         id: 2,
         name: "Куче",
-        image: "https://raw.githubusercontent.com/papybg/Kade-da-me-otkriesh/main/images/h/dog.jpg",
+        image: "/images/dog.jpg",
         index: "h",
         category: "домашни",
         createdAt: new Date(),
@@ -84,7 +84,7 @@ export class MemStorage implements IStorage {
       {
         id: 3,
         name: "Кокошка",
-        image: "https://raw.githubusercontent.com/papybg/Kade-da-me-otkriesh/main/images/p/chicken.png",
+        image: "/images/chicken.png",
         index: "p",
         category: "селскостопански",
         createdAt: new Date(),
@@ -92,7 +92,7 @@ export class MemStorage implements IStorage {
       {
         id: 4,
         name: "Влак",
-        image: "https://raw.githubusercontent.com/papybg/Kade-da-me-otkriesh/main/images/i/train.jpg",
+        image: "/images/train.jpg",
         index: "i",
         category: "транспорт",
         createdAt: new Date(),
@@ -100,7 +100,7 @@ export class MemStorage implements IStorage {
       {
         id: 5,
         name: "Автобус",
-        image: "https://raw.githubusercontent.com/papybg/Kade-da-me-otkriesh/main/images/r/bus.jpg",
+        image: "/images/bus.jpg",
         index: "r",
         category: "транспорт",
         createdAt: new Date(),
@@ -108,7 +108,7 @@ export class MemStorage implements IStorage {
       {
         id: 6,
         name: "Врана",
-        image: "https://raw.githubusercontent.com/papybg/Kade-da-me-otkriesh/main/images/s/crow.png",
+        image: "/images/crow.png",
         index: "s",
         category: "птици",
         createdAt: new Date(),
@@ -120,7 +120,7 @@ export class MemStorage implements IStorage {
       {
         id: 7,
         name: "Крава",
-        image: "https://raw.githubusercontent.com/papybg/Kade-da-me-otkriesh/main/images/p/cow.png",
+        image: "/images/cow.png",
         index: "p", 
         category: "селскостопански",
         createdAt: new Date(),
@@ -128,7 +128,7 @@ export class MemStorage implements IStorage {
       {
         id: 8,
         name: "Самолет",
-        image: "https://raw.githubusercontent.com/papybg/Kade-da-me-otkriesh/main/images/s/airplane.jpg",
+        image: "/images/airplane.jpg",
         index: "s",
         category: "транспорт", 
         createdAt: new Date(),
@@ -144,15 +144,15 @@ export class MemStorage implements IStorage {
     const defaultLayout: GameLayout = {
       id: "d1",
       name: "Зелена долина - Ниво 1",
-      backgroundLarge: "https://raw.githubusercontent.com/papybg/Kade-da-me-otkriesh/main/assets/backgrounds/dolina-large.png",
-      backgroundSmall: "https://raw.githubusercontent.com/papybg/Kade-da-me-otkriesh/main/assets/backgrounds/dolina-small.png",
+      backgroundLarge: "/images/backgrounds/dolina-large.png",
+      backgroundSmall: "/images/backgrounds/dolina-small.png",
       slots: [
-        { index: ["s"], position: { top: "25%", left: "15%" }, diameter: "10%" },
-        { index: ["s"], position: { top: "23%", left: "80%" }, diameter: "10%" },
-        { index: ["p", "h"], position: { top: "70%", left: "80%" }, diameter: "10%" },
-        { index: ["i"], position: { top: "75%", left: "40%" }, diameter: "10%" },
-        { index: ["r"], position: { top: "65%", left: "65%" }, diameter: "10%" },
-        { index: ["p"], position: { top: "72%", left: "92%" }, diameter: "10%" },
+        { index: ["s"], position: { top: "25%", left: "15%" }, diameter: "11%" },
+        { index: ["s"], position: { top: "23%", left: "80%" }, diameter: "11%" },
+        { index: ["p", "h"], position: { top: "70%", left: "80%" }, diameter: "11%" },
+        { index: ["i"], position: { top: "75%", left: "40%" }, diameter: "11%" },
+        { index: ["r"], position: { top: "65%", left: "65%" }, diameter: "11%" },
+        { index: ["p"], position: { top: "72%", left: "92%" }, diameter: "11%" },
       ],
       createdAt: new Date(),
     };

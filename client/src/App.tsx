@@ -18,7 +18,6 @@ type Screen = "welcome" | "portals" | "game" | "win";
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>("welcome");
   const [selectedPortal, setSelectedPortal] = useState<Portal | null>(null);
-  const [gameResult, setGameResult] = useState<{ score: number; time: number } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const handleEnterGame = () => {
@@ -28,7 +27,6 @@ function App() {
   const handleBackToWelcome = () => {
     setCurrentScreen("welcome");
     setSelectedPortal(null);
-    setGameResult(null);
   };
 
   const handleSelectPortal = (portal: Portal) => {
@@ -39,16 +37,13 @@ function App() {
   const handleBackToMenu = () => {
     setCurrentScreen("portals");
     setSelectedPortal(null);
-    setGameResult(null);
   };
 
-  const handleWin = (score: number, time: number) => {
-    setGameResult({ score, time });
+  const handleWin = () => {
     setCurrentScreen("win");
   };
 
   const handlePlayAgain = () => {
-    setGameResult(null);
     setCurrentScreen("game");
   };
 
@@ -93,10 +88,8 @@ function App() {
                 />
               )}
               
-              {currentScreen === "win" && gameResult && (
+              {currentScreen === "win" && (
                 <Win
-                  score={gameResult.score}
-                  timeSpent={gameResult.time}
                   onPlayAgain={handlePlayAgain}
                   onNextLevel={handleNextLevel}
                   onBackToMenu={handleBackToMenu}
