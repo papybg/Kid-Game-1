@@ -68,7 +68,7 @@ export class MemStorage implements IStorage {
       {
         id: 1,
         name: "Котка",
-        image: "/images/cat.jpg",
+        image: "/images/cat.png",
         index: "h",
         category: "домашни",
         createdAt: new Date(),
@@ -76,7 +76,7 @@ export class MemStorage implements IStorage {
       {
         id: 2,
         name: "Куче",
-        image: "/images/dog.jpg",
+        image: "/images/dog.png",
         index: "h",
         category: "домашни",
         createdAt: new Date(),
@@ -92,7 +92,7 @@ export class MemStorage implements IStorage {
       {
         id: 4,
         name: "Влак",
-        image: "/images/train.jpg",
+        image: "/images/train.png",
         index: "i",
         category: "транспорт",
         createdAt: new Date(),
@@ -100,7 +100,7 @@ export class MemStorage implements IStorage {
       {
         id: 5,
         name: "Автобус",
-        image: "/images/bus.jpg",
+        image: "/images/bus.png",
         index: "r",
         category: "транспорт",
         createdAt: new Date(),
@@ -128,7 +128,7 @@ export class MemStorage implements IStorage {
       {
         id: 8,
         name: "Самолет",
-        image: "/images/airplane.jpg",
+        image: "/images/airplane.png",
         index: "s",
         category: "транспорт", 
         createdAt: new Date(),
