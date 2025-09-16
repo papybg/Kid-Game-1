@@ -1,6 +1,10 @@
+import { useState } from "react";
 import { Button } from "../components/ui/button";
+import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
+import { Label } from "../components/ui/label";
 import { Settings, Play, Brain, Gamepad2, Smartphone, Volume2 } from "lucide-react";
 import { useAudioContext } from "../components/audio-manager";
+import { useSettingsStore, type GameMode } from "../lib/settings-store";
 
 interface WelcomeProps {
   onEnterGame: () => void;
@@ -9,8 +13,13 @@ interface WelcomeProps {
 
 export default function Welcome({ onEnterGame, onOpenSettings }: WelcomeProps) {
   const { initializeAudio, playSound } = useAudioContext();
+  const { setGameMode } = useSettingsStore();
+  const [selectedMode, setSelectedMode] = useState<GameMode>('advanced');
 
   const handleEnterGame = async () => {
+    // Записваме избрания режим в settings store
+    setGameMode(selectedMode);
+
     await initializeAudio();
     // Remove automatic start sound - let the game handle audio cues
     onEnterGame();
@@ -52,6 +61,43 @@ export default function Welcome({ onEnterGame, onOpenSettings }: WelcomeProps) {
             <Volume2 className="w-4 h-4 text-blue-200" />
             <span>Звукови ефекти</span>
           </div>
+        </div>
+        
+        {/* Game Mode Selection */}
+        <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 animate-slide-up" style={{ animationDelay: "0.25s" }}>
+          <h3 className="text-white font-semibold text-lg mb-4 text-center">
+            Избери режим на играта
+          </h3>
+          <RadioGroup
+            value={selectedMode}
+            onValueChange={(value) => setSelectedMode(value as GameMode)}
+            className="space-y-3"
+          >
+            <div className="flex items-center space-x-3 p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
+              <RadioGroupItem value="simple" id="simple" />
+              <Label
+                htmlFor="simple"
+                className="flex-1 text-white cursor-pointer"
+              >
+                <div className="font-medium">Игра за мъници (2+)</div>
+                <div className="text-sm text-blue-100 opacity-80">
+                  Всички клетки са видими от началото
+                </div>
+              </Label>
+            </div>
+            <div className="flex items-center space-x-3 p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
+              <RadioGroupItem value="advanced" id="advanced" />
+              <Label
+                htmlFor="advanced"
+                className="flex-1 text-white cursor-pointer"
+              >
+                <div className="font-medium">Игра за малчугани (4+)</div>
+                <div className="text-sm text-blue-100 opacity-80">
+                  Клетките се показват последователно
+                </div>
+              </Label>
+            </div>
+          </RadioGroup>
         </div>
         
         {/* Enter Button */}

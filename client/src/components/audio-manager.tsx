@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useAudio } from "../hooks/use-audio";
+import { useSettingsStore } from "../lib/settings-store";
 
 type AudioContextType = {
   isInitialized: boolean;
@@ -56,10 +57,10 @@ const ITEM_AUDIO_MAP: { [itemName: string]: string } = {
 
 export function AudioProvider({ children }: { children: React.ReactNode }) {
   const [isInitialized, setIsInitialized] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [musicEnabled, setMusicEnabled] = useState(true);
-  const [effectsEnabled, setEffectsEnabled] = useState(true);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
+  
+  // Use settings from store instead of local state
+  const { soundEnabled, musicEnabled } = useSettingsStore();
   
   const { initializeAudio: initAudio, playTone } = useAudio();
   
@@ -76,28 +77,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     setIsAudioPlaying(false);
   };
 
-  useEffect(() => {
-    // Load settings from localStorage
-    const savedSound = localStorage.getItem('soundEnabled');
-    const savedMusic = localStorage.getItem('musicEnabled');
-    const savedEffects = localStorage.getItem('effectsEnabled');
-
-    if (savedSound !== null) setSoundEnabled(savedSound === 'true');
-    if (savedMusic !== null) setMusicEnabled(savedMusic === 'true');
-    if (savedEffects !== null) setEffectsEnabled(savedEffects === 'true');
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem('soundEnabled', soundEnabled.toString());
-  }, [soundEnabled]);
-
-  useEffect(() => {
-    localStorage.setItem('musicEnabled', musicEnabled.toString());
-  }, [musicEnabled]);
-
-  useEffect(() => {
-    localStorage.setItem('effectsEnabled', effectsEnabled.toString());
-  }, [effectsEnabled]);
+  // Settings are now managed by the store, no need for local localStorage handling
 
   const initializeAudio = async () => {
     try {
@@ -111,7 +91,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
 
   // Remove all complex queue and preloading functions
   const playSound = (type: 'success' | 'error' | 'click' | 'start' | 'win') => {
-    if (!isInitialized || !soundEnabled || !effectsEnabled) return;
+    if (!isInitialized || !soundEnabled) return;
     
     const frequencies = {
       success: [440, 554, 659],
@@ -130,7 +110,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   };
 
   const playVoice = (type: 'bravo' | 'tryAgain') => {
-    if (!isInitialized || !soundEnabled || !effectsEnabled) return;
+    if (!isInitialized || !soundEnabled) return;
 
     // Stop any currently playing audio first
     stopCurrentAudio();
@@ -185,7 +165,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       }
     }
   };  const playAnimalSound = (itemNameOrIndex: string, delay?: number) => {
-    if (!isInitialized || !soundEnabled || !effectsEnabled) return;
+    if (!isInitialized || !soundEnabled) return;
     
     const playAfterDelay = () => {
       // Stop any currently playing audio first
@@ -239,11 +219,11 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         isInitialized,
         soundEnabled,
         musicEnabled,
-        effectsEnabled,
+        effectsEnabled: true, // Always enabled for now, can be extended later
         isAudioPlaying,
-        setSoundEnabled,
-        setMusicEnabled,
-        setEffectsEnabled,
+        setSoundEnabled: () => {}, // Placeholder, managed by settings store
+        setMusicEnabled: () => {}, // Placeholder, managed by settings store
+        setEffectsEnabled: () => {}, // Placeholder, managed by settings store
         playSound,
         playVoice,
         playAnimalSound,

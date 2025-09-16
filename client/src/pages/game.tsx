@@ -8,6 +8,7 @@ import { ChoiceItem } from "../components/game/choice-item";
 import { FeedbackMessageComponent } from "../components/game/feedback-message";
 import { useGameState } from "../hooks/use-game-state";
 import { useAudioContext } from "../components/audio-manager";
+import { useSettingsStore } from "../lib/settings-store";
 import { generateChoicePool } from "../lib/game-logic";
 import type { Portal, GameLayout, GameItem } from "@shared/schema";
 
@@ -21,6 +22,9 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [previousPlacedItems, setPreviousPlacedItems] = useState<Record<string, GameItem>>({});
   const { soundEnabled, setSoundEnabled, playSound, playVoice, playAnimalSound, isAudioPlaying } = useAudioContext();
+  
+  // Get game mode from settings store
+  const { gameMode } = useSettingsStore();
   
   const {
     gameState,
@@ -214,34 +218,61 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
       
       {/* Game Slots Overlay */}
       <div className="absolute inset-0 z-10 pointer-events-none">
-        {/* Active slot only - show only when game is playing */}
-        {gameState.isPlaying && activeSlot && (
-          <GameSlotComponent
-            key={`${activeSlot.position.top}-${activeSlot.position.left}`}
-            slot={activeSlot}
-            isActive={true}
-            className="pointer-events-auto"
-          />
+        {/* Game slots rendering based on game mode */}
+        {gameState.isPlaying && layout && (
+          <>
+            {gameMode === 'simple' ? (
+              // Simple mode: Show ALL slots from the start
+              layout.slots.map((slot) => {
+                const slotId = `${slot.position.top}-${slot.position.left}`;
+                const isSlotActive = activeSlot && 
+                  activeSlot.position.top === slot.position.top && 
+                  activeSlot.position.left === slot.position.left ? true : false;
+                const placedItem = gameState.placedItems[slotId];
+                
+                return (
+                  <GameSlotComponent
+                    key={slotId}
+                    slot={slot}
+                    isActive={isSlotActive}
+                    isCompleted={!!placedItem}
+                    placedItem={placedItem}
+                    className="pointer-events-auto"
+                  />
+                );
+              })
+            ) : (
+              // Advanced mode: Show only active slot
+              activeSlot && (
+                <GameSlotComponent
+                  key={`${activeSlot.position.top}-${activeSlot.position.left}`}
+                  slot={activeSlot}
+                  isActive={true}
+                  className="pointer-events-auto"
+                />
+              )
+            )}
+            
+            {/* Placed items (filled slots) - shown in both modes */}
+            {Object.entries(gameState.placedItems).map(([slotId, item]) => {
+              // Find the original slot definition for positioning
+              const [top, left] = slotId.split('-');
+              const originalSlot = layout.slots.find(s => s.position.top === top && s.position.left === left);
+              
+              if (!originalSlot) return null;
+              
+              return (
+                <GameSlotComponent
+                  key={`filled-${slotId}`}
+                  slot={originalSlot}
+                  isCompleted={true}
+                  placedItem={item}
+                  className="pointer-events-auto"
+                />
+              );
+            })}
+          </>
         )}
-        
-        {/* Placed items (filled slots) */}
-        {layout && Object.entries(gameState.placedItems).map(([slotId, item]) => {
-          // Find the original slot definition for positioning
-          const [top, left] = slotId.split('-');
-          const originalSlot = layout.slots.find(s => s.position.top === top && s.position.left === left);
-          
-          if (!originalSlot) return null;
-          
-          return (
-            <GameSlotComponent
-              key={`filled-${slotId}`}
-              slot={originalSlot}
-              isCompleted={true}
-              placedItem={item}
-              className="pointer-events-auto"
-            />
-          );
-        })}
       </div>
       
       {/* Feedback Messages */}
