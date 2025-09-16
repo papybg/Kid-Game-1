@@ -39,7 +39,7 @@ export function GameSlotComponent({ slot, isActive, isCompleted, placedItem, cla
       data-testid={`game-slot-${slot.index.join('-')}`}
     >
       {placedItem && (
-        <div className="absolute inset-0">
+        <div className="absolute inset-0 p-2">
           <img
             src={placedItem.image}
             alt={placedItem.name}

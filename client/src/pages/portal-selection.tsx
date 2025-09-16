@@ -96,7 +96,7 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
                 <img
                   src={portal.icon}
                   alt={portal.name}
-                  className="w-full h-48 object-cover"
+                  className="w-full h-48 object-contain"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
                 <div className="absolute bottom-4 left-4 text-white">
@@ -128,7 +128,7 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
               <img
                 src="https://images.unsplash.com/photo-1544551763-46a013bb70d5?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&h=300"
                 alt="Подводен свят"
-                className="w-full h-48 object-cover"
+                className="w-full h-48 object-contain"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
               <div className="absolute bottom-4 left-4 text-white">
@@ -148,7 +148,7 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
               <img
                 src="https://images.unsplash.com/photo-1516426122078-c23e76319801?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&h=300"
                 alt="Африканска савана"
-                className="w-full h-48 object-cover"
+                className="w-full h-48 object-contain"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
               <div className="absolute bottom-4 left-4 text-white">
