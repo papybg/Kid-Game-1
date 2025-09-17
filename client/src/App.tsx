@@ -19,6 +19,7 @@ function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>("welcome");
   const [selectedPortal, setSelectedPortal] = useState<Portal | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [gameKey, setGameKey] = useState(0); // Key to force Game component remount
 
   const handleEnterGame = () => {
     setCurrentScreen("portals");
@@ -35,7 +36,7 @@ function App() {
   };
 
   const handleBackToMenu = () => {
-    setCurrentScreen("portals");
+    setCurrentScreen("welcome");
     setSelectedPortal(null);
   };
 
@@ -44,6 +45,7 @@ function App() {
   };
 
   const handlePlayAgain = () => {
+    setGameKey(prev => prev + 1); // Force Game component remount
     setCurrentScreen("game");
   };
 
@@ -82,6 +84,7 @@ function App() {
               
               {currentScreen === "game" && selectedPortal && (
                 <Game
+                  key={gameKey}
                   portal={selectedPortal}
                   onBackToMenu={handleBackToMenu}
                   onWin={handleWin}

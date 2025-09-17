@@ -104,15 +104,20 @@
   }
 
   .choice-zone::-webkit-scrollbar {
-    height: 8px;
+    width: 0;
+    height: 0;
   }
 
   .choice-zone::-webkit-scrollbar-track {
-    @apply bg-black/10 rounded;
+    background: transparent;
   }
 
   .choice-zone::-webkit-scrollbar-thumb {
-    @apply bg-primary/50 rounded hover:bg-primary/70;
+    background: transparent;
+  }
+
+  .choice-zone::-webkit-scrollbar-corner {
+    background: transparent;
   }
 }
 

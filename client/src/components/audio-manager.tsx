@@ -11,7 +11,7 @@ type AudioContextType = {
   setSoundEnabled: (enabled: boolean) => void;
   setMusicEnabled: (enabled: boolean) => void;
   setEffectsEnabled: (enabled: boolean) => void;
-  playSound: (type: 'success' | 'error' | 'click' | 'start' | 'win') => void;
+  playSound: (type: 'success' | 'error' | 'click' | 'start' | 'win' | 'bell') => void;
   playVoice: (type: 'bravo' | 'tryAgain') => void;
   playAnimalSound: (itemNameOrIndex: string, delay?: number) => void;
   initializeAudio: () => Promise<void>;
@@ -90,7 +90,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Remove all complex queue and preloading functions
-  const playSound = (type: 'success' | 'error' | 'click' | 'start' | 'win') => {
+  const playSound = (type: 'success' | 'error' | 'click' | 'start' | 'win' | 'bell') => {
     if (!isInitialized || !soundEnabled) return;
     
     const frequencies = {
@@ -99,6 +99,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       click: [800],
       start: [261, 329, 392],
       win: [523, 659, 784, 1047],
+      bell: [800, 1000, 1200], // Happy bell sound
     };
 
     const freqs = frequencies[type];

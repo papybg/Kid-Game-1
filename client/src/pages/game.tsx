@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useLayoutEffect } from "react";
 import { Button } from "../components/ui/button";
 import { ArrowLeft, Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -21,7 +21,13 @@ interface GameProps {
 export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [previousPlacedItems, setPreviousPlacedItems] = useState<Record<string, GameItem>>({});
-  const { soundEnabled, setSoundEnabled, playSound, playVoice, playAnimalSound, isAudioPlaying } = useAudioContext();
+  const [disappearingItems, setDisappearingItems] = useState<Set<number>>(new Set()); // Track items that should disappear
+  const [selectedItem, setSelectedItem] = useState<GameItem | null>(null); // Currently selected item for placement
+  const [animatingItem, setAnimatingItem] = useState<{item: GameItem, targetPosition: {top: number, left: number}} | null>(null); // Item being animated
+  const [isAnimationInProgress, setIsAnimationInProgress] = useState(false); // Track if animation is in progress
+  const choiceZoneRef = useRef<HTMLDivElement>(null); // Ref for choice zone container
+  const [choiceZoneHeight, setChoiceZoneHeight] = useState(131); // Dynamic height for choice zone
+    const { soundEnabled, setSoundEnabled, playSound, playVoice, playAnimalSound, isAudioPlaying } = useAudioContext();
   
   // Get game mode from settings store
   const { gameMode } = useSettingsStore();
@@ -62,10 +68,60 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Automatic fullscreen on level start
+  useEffect(() => {
+    const requestFullscreen = async () => {
+      try {
+        if (!document.fullscreenElement) {
+          if (document.documentElement.requestFullscreen) {
+            await document.documentElement.requestFullscreen();
+          } else if ((document.documentElement as any).webkitRequestFullscreen) {
+            await (document.documentElement as any).webkitRequestFullscreen();
+          } else if ((document.documentElement as any).mozRequestFullScreen) {
+            await (document.documentElement as any).mozRequestFullScreen();
+          } else if ((document.documentElement as any).msRequestFullscreen) {
+            await (document.documentElement as any).msRequestFullscreen();
+          }
+        }
+      } catch (error) {
+        console.warn('Could not enter fullscreen mode:', error);
+      }
+    };
+
+    // Request fullscreen when the game component mounts (level starts)
+    requestFullscreen();
+  }, []); // Empty dependency array means this runs once when component mounts
+
+  // Dynamic choice zone height calculation
+  useLayoutEffect(() => {
+    if (gameState.choiceItems.length > 0 && choiceZoneRef.current) {
+      const container = choiceZoneRef.current;
+      const itemElements = container.children;
+
+      if (itemElements.length > 0) {
+        let maxHeight = 0;
+
+        // Measure each item's actual rendered height
+        for (let i = 0; i < itemElements.length; i++) {
+          const itemElement = itemElements[i] as HTMLElement;
+          const itemHeight = itemElement.getBoundingClientRect().height;
+          maxHeight = Math.max(maxHeight, itemHeight);
+        }
+
+        if (maxHeight > 0) {
+          // Set height to 102% of the maximum item height
+          const newHeight = Math.ceil(maxHeight * 1.02);
+          setChoiceZoneHeight(newHeight);
+        }
+      }
+    }
+  }, [gameState.choiceItems]);
+
+  const toggleSound = () => {
+    setSoundEnabled(!soundEnabled);
+  };
+
   const activeSlot = gameState.availableSlots.length > 0 ? gameState.availableSlots[0] : null;
-  const filteredChoiceItems = gameState.isPlaying && activeSlot 
-    ? gameState.choiceItems.filter(item => activeSlot.index.includes(item.index))
-    : [];
 
   useEffect(() => {
     if (layout && allItems) {
@@ -89,13 +145,14 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
   }, [gameState.placedItems]);
 
   useEffect(() => {
-    if (isGameComplete) {
+    if (isGameComplete && !isAnimationInProgress && !isAudioPlaying) {
       playSound('win');
+      // Show WIN screen after win sound plays
       setTimeout(() => {
         onWin();
-      }, 4500); // Increased from 1500ms to 4500ms to allow time for all sounds
+      }, 2000);
     }
-  }, [isGameComplete, gameState.score, timeElapsed, onWin, playSound]);
+  }, [isGameComplete, isAnimationInProgress, isAudioPlaying, onWin, playSound]);
 
   const handleStartTurn = () => {
     // Remove automatic start sound - let the game flow naturally
@@ -103,32 +160,116 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
   };
 
   const handleChoiceClick = (item: GameItem) => {
-    if (gameState.usedItems.includes(item.id) || isAudioPlaying || !activeSlot) return;
+    if (gameState.usedItems.includes(item.id) || isAudioPlaying) return;
 
     playSound('click');
-    const isValid = makeChoice(item, activeSlot, false); // Don't remove slot immediately
 
-    if (isValid) {
-      showFeedback('success', 'Браво!');
+    if (gameMode === 'simple') {
+      // Simple mode: Item-first logic with double-click
+      if (!selectedItem) {
+        // First click - select the item
+        setSelectedItem(item);
+        showFeedback('success', 'КЪДЕ ЩЕ СЛОЖИШ ТОВА');
+        // Remove bravo voice from simple mode (2+)
+      } else if (selectedItem.id === item.id) {
+        // Second click on the same item - place it
+        const targetSlot = gameState.availableSlots.find(slot =>
+          slot.index.includes(item.index)
+        );
 
-      // Play "BRAВО" voice first, then animal sound after 2 seconds delay (reduced from 3)
-      playVoice('bravo');
-      setTimeout(() => {
-        playAnimalSound(item.name);
-        // Wait for animal sound to finish before moving to next slot
+        if (!targetSlot) {
+          showFeedback('error', 'Няма място за този предмет!');
+          playVoice('tryAgain');
+          setSelectedItem(null);
+          return;
+        }
+
+        // Start animation to target position
+        setAnimatingItem({
+          item,
+          targetPosition: {
+            top: parseInt(targetSlot.position.top),
+            left: parseInt(targetSlot.position.left)
+          }
+        });
+        setIsAnimationInProgress(true);
+
+        // Mark item for disappearing animation after animation completes
         setTimeout(() => {
-          // Remove the current slot and move to next one
-          removeCurrentSlot(activeSlot);
-        }, 2500); // Wait 2.5 seconds for animal sound to finish
-      }, 2000); // Reduced from 3000 to 2000
+          setDisappearingItems(prev => new Set([...prev, item.id]));
+          setAnimatingItem(null);
+          setIsAnimationInProgress(false);
 
+          // Place the item
+          const isValid = makeChoice(item, targetSlot, true);
+
+          if (isValid) {
+            playSound('bell');
+            setTimeout(() => {
+              playAnimalSound(item.name);
+            }, 1000);
+          }
+
+          // Clear selection
+          setSelectedItem(null);
+        }, 1000); // Wait for animation to complete
+      } else {
+        // Clicked on different item - select the new one
+        setSelectedItem(item);
+        showFeedback('success', 'КЪДЕ ЩЕ СЛОЖИШ ТОВА');
+        // Remove bravo voice from simple mode (2+)
+      }
     } else {
-      showFeedback('error', 'Опитай пак!');
-      playVoice('tryAgain');
-      // For wrong choices, don't play animal sound - just the voice feedback
+      // Advanced mode: Slot-first logic with single-click
+      if (!activeSlot) {
+        showFeedback('error', 'Няма активна клетка!');
+        playVoice('tryAgain');
+        return;
+      }
+
+      // Check if the item matches the active slot
+      if (!activeSlot.index.includes(item.index)) {
+        showFeedback('error', 'Опитай пак!');
+        playVoice('tryAgain');
+        return;
+      }
+
+      // Start animation to target position
+      setAnimatingItem({
+        item,
+        targetPosition: {
+          top: parseInt(activeSlot.position.top),
+          left: parseInt(activeSlot.position.left)
+        }
+      });
+      setIsAnimationInProgress(true);
+
+      // Mark item for disappearing animation after animation completes
+      setTimeout(() => {
+        setDisappearingItems(prev => new Set([...prev, item.id]));
+        setAnimatingItem(null);
+        setIsAnimationInProgress(false);
+
+        // Place the item
+        const isValid = makeChoice(item, activeSlot, false);
+
+        if (isValid) {
+          showFeedback('success', 'Браво!');
+          playVoice('bravo');
+          playSound('bell');
+          setTimeout(() => {
+            playAnimalSound(item.name);
+          }, 1000);
+          
+          // Move to next slot after successful placement
+          setTimeout(() => {
+            if (gameState.isPlaying) {
+              removeCurrentSlot(activeSlot);
+            }
+          }, 2000);
+        }
+      }, 1000); // Wait for animation to complete
     }
-  };  const toggleSound = () => {
-    setSoundEnabled(!soundEnabled);
   };
 
   if (layoutLoading || itemsLoading) {
@@ -161,7 +302,7 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
   const backgroundUrl = isMobile ? layout.backgroundSmall : layout.backgroundLarge;
 
   return (
-    <div className="fixed inset-0 z-30">
+    <div className="fixed inset-0 z-30 w-screen h-screen">
       {/* Game Background */}
       <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-500"
@@ -187,7 +328,7 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
             <h1 className="font-display font-bold text-xl md:text-2xl">{portal.name}</h1>
             <div className="text-sm bg-white/20 backdrop-blur-sm rounded-full px-4 py-1 mt-2 inline-block">
               {gameState.isPlaying
-                ? "Какво ще поставиш тук"
+                ? "Къде ще сложиш това"
                 : "Натисни СТАРТ за да започнеш!"
               }
             </div>
@@ -229,7 +370,7 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
                   activeSlot.position.top === slot.position.top && 
                   activeSlot.position.left === slot.position.left ? true : false;
                 const placedItem = gameState.placedItems[slotId];
-                
+
                 return (
                   <GameSlotComponent
                     key={slotId}
@@ -252,7 +393,7 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
                 />
               )
             )}
-            
+
             {/* Placed items (filled slots) - shown in both modes */}
             {Object.entries(gameState.placedItems).map(([slotId, item]) => {
               // Find the original slot definition for positioning
@@ -294,27 +435,56 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
         </div>
       )}
 
+      {/* Game Complete - Show WIN Button */}
+      {false && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+          <div className="pointer-events-auto text-center">
+            <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-8 shadow-2xl">
+              <h2 className="text-3xl font-bold text-green-600 mb-4">🎉 ПОБЕДА! 🎉</h2>
+              <p className="text-lg text-gray-700 mb-6">Завърши успешно играта!</p>
+              <Button
+                onClick={onWin}
+                className="bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-8 rounded-2xl text-xl"
+              >
+                Продължи
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Game Footer */}
       <div className="absolute bottom-0 left-0 right-0 z-20 p-4 bg-gradient-to-t from-black/50 to-transparent pb-[calc(env(safe-area-inset-bottom)+16px)]">
         
-        {/* Choice Zone */}
+        {/* Choice Zone - show for all modes */}
         {gameState.isPlaying && (
           <div className="max-w-6xl mx-auto">
-            <div className="bg-black/30 backdrop-blur-sm rounded-2xl p-4">
+            <div className="bg-black/10 backdrop-blur-sm rounded-2xl p-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-white text-sm font-medium">
-                  Избери правилния предмет
+                  
                 </span>
                 <div className="flex gap-2">
                 </div>
               </div>
-              <div className="choice-zone flex gap-3 overflow-x-auto pb-2">
+              <div 
+                ref={choiceZoneRef}
+                className="choice-zone flex gap-3 overflow-x-auto pb-2"
+                style={{
+                  height: `${choiceZoneHeight}px`,
+                  width: `calc(${(gameState.choiceItems.length * 128) + ((gameState.choiceItems.length - 1) * 12)}px * 1.02)`
+                }}
+              >
                 {gameState.choiceItems.map((item) => (
                   <ChoiceItem
                     key={item.id}
                     item={item}
                     isUsed={gameState.usedItems.includes(item.id)}
                     isDisabled={isAudioPlaying}
+                    shouldDisappear={disappearingItems.has(item.id)}
+                    isSelected={selectedItem?.id === item.id}
+                    isAnimating={animatingItem?.item.id === item.id}
+                    targetPosition={animatingItem?.item.id === item.id ? animatingItem.targetPosition : undefined}
                     onClick={handleChoiceClick}
                   />
                 ))}

@@ -150,7 +150,7 @@ export class MemStorage implements IStorage {
         { index: ["s"], position: { top: "25%", left: "15%" }, diameter: "11%" },
         { index: ["s"], position: { top: "23%", left: "80%" }, diameter: "11%" },
         { index: ["p", "h"], position: { top: "70%", left: "80%" }, diameter: "11%" },
-        { index: ["i"], position: { top: "75%", left: "40%" }, diameter: "11%" },
+        { index: ["i"], position: { top: "69%", left: "35%" }, diameter: "11%" },
         { index: ["r"], position: { top: "65%", left: "65%" }, diameter: "11%" },
         { index: ["p"], position: { top: "72%", left: "92%" }, diameter: "11%" },
       ],

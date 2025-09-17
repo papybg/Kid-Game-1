@@ -21,7 +21,7 @@ interface SettingsState {
 const initialState = {
   soundEnabled: true,
   musicEnabled: true,
-  gameMode: 'advanced' as GameMode,
+  gameMode: 'simple' as GameMode, // Default to simple mode (2+)
 };
 
 export const useSettingsStore = create<SettingsState>()(

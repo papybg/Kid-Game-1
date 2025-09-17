@@ -64,10 +64,15 @@ export function useGameState() {
   }, []);
 
   const startTurn = useCallback(() => {
-    setGameState(prev => ({
-      ...prev,
-      isPlaying: true,
-    }));
+    setGameState(prev => {
+      // Don't start if game is already complete
+      if (prev.availableSlots.length === 0) return prev;
+      
+      return {
+        ...prev,
+        isPlaying: true,
+      };
+    });
   }, []);
 
   const makeChoice = useCallback((item: GameItem, activeSlot: GameSlot | null, removeSlotImmediately: boolean = true): boolean => {
@@ -82,13 +87,15 @@ export function useGameState() {
     const slotId = `${activeSlot.position.top}-${activeSlot.position.left}`;
 
     setGameState(prev => {
+      const newAvailableSlots = removeSlotImmediately ? prev.availableSlots.filter(slot => slot !== activeSlot) : prev.availableSlots;
       const newState = {
         ...prev,
         usedItems: [...prev.usedItems, item.id],
-        availableSlots: removeSlotImmediately ? prev.availableSlots.filter(slot => slot !== activeSlot) : prev.availableSlots,
+        availableSlots: newAvailableSlots,
         placedItems: { ...prev.placedItems, [slotId]: item },
         score: prev.score + 10,
-        isPlaying: removeSlotImmediately ? prev.availableSlots.length > 1 : true, // Keep playing if more than 1 slot (current one will be removed)
+        // Keep playing until all slots are filled
+        isPlaying: newAvailableSlots.length > 0,
       };
       
       try {
@@ -147,10 +154,12 @@ export function useGameState() {
 
   const removeCurrentSlot = useCallback((slotToRemove: GameSlot) => {
     setGameState(prev => {
+      const newAvailableSlots = prev.availableSlots.filter(slot => slot !== slotToRemove);
       const newState = {
         ...prev,
-        availableSlots: prev.availableSlots.filter(slot => slot !== slotToRemove),
-        isPlaying: prev.availableSlots.length > 1,
+        availableSlots: newAvailableSlots,
+        // Keep playing until all slots are filled
+        isPlaying: newAvailableSlots.length > 0,
       };
       
       try {

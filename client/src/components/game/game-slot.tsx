@@ -39,12 +39,16 @@ export function GameSlotComponent({ slot, isActive, isCompleted, placedItem, cla
       data-testid={`game-slot-${slot.index.join('-')}`}
     >
       {placedItem && (
-        <div className="absolute inset-0 p-2">
+        <div className="absolute inset-0 p-2 flex items-center justify-center">
           <img
             src={placedItem.image}
             alt={placedItem.name}
-            className="w-full h-full object-contain"
+            className="w-full h-full object-contain transform"
+            style={{
+              transform: placedItem.name === "Влак" ? "scale(3)" : "scale(1.5)"
+            }}
             data-testid={`placed-item-${placedItem.id}`}
+            data-item-name={placedItem.name}
           />
         </div>
       )}
