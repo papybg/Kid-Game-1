@@ -1,15 +1,27 @@
-import { QueryClient, DefaultOptions } from '@tanstack/react-query';
+import { QueryClient, DefaultOptions, QueryFunction } from '@tanstack/react-query';
 
 // This helper function builds the full URL safely
 const buildUrl = (path: string) => {
   // Get the base URL from the environment variable. Default to an empty string if not set.
   const baseUrl = import.meta.env.VITE_API_BASE || '';
-  // Use the URL constructor to safely join the base URL and the path
-  return new URL(path, baseUrl).toString();
+
+  // If no base URL is set, assume we're in development and use localhost
+  if (!baseUrl) {
+    return `http://localhost:3005/${path}`;
+  }
+
+  // Ensure baseUrl doesn't end with slash
+  const cleanBaseUrl = baseUrl.replace(/\/$/, '');
+
+  // Ensure path starts with slash
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+
+  // Combine them safely
+  return `${cleanBaseUrl}${cleanPath}`;
 };
 
 
-const getQueryFn = async <T>({ queryKey }: { queryKey: (string | number)[] }): Promise<T> => {
+const getQueryFn: QueryFunction = async ({ queryKey }) => {
   // Join the parts of the query key to form a path, e.g., ['api', 'portals'] becomes 'api/portals'
   const path = queryKey.join('/');
   
@@ -21,7 +33,7 @@ const getQueryFn = async <T>({ queryKey }: { queryKey: (string | number)[] }): P
   if (!response.ok) {
     throw new Error(`Network response was not ok. Status: ${response.status}`);
   }
-  return response.json() as Promise<T>;
+  return response.json();
 };
 
 const queryConfig: { defaultOptions: DefaultOptions } = {
