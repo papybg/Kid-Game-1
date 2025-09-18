@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { getDirname } from "./utils";
@@ -9,37 +10,27 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Configurable CORS allowlist. Set ALLOWED_ORIGINS as a comma-separated list or '*' to allow all.
-// Example: ALLOWED_ORIGINS="https://your-netlify-site.netlify.app,https://example.com"
-app.use((req, res, next) => {
-  const allowedRaw = process.env.ALLOWED_ORIGINS ?? 'http://localhost:5173,http://localhost:5176,http://localhost:5177';
-  const allowed = allowedRaw.split(',').map(s => s.trim()).filter(Boolean);
-  const origin = (req.headers.origin || '').toString();
-
-  // If allowlist contains '*' then allow everything.
-  const allowAll = allowed.includes('*');
-  const isAllowed = allowAll || allowed.includes(origin) || (!origin && allowed.includes('http://localhost:5173')) || origin?.endsWith('.netlify.app');
-
-  if (isAllowed) {
-    // If allowAll is true we must not send Access-Control-Allow-Credentials: true with a wildcard origin
-    // Browsers reject wildcard origin when credentials are included. If allowAll is set, send '*' as origin
-    // but don't set credentials header. If origin is specific, echo it and allow credentials.
-    res.header('Access-Control-Allow-Origin', origin || (allowAll ? '*' : allowed[0] || '*'));
-    if (!allowAll && origin) {
-      res.header('Access-Control-Allow-Credentials', 'true');
+// CORS настройки - разреши всички Vercel домейни и localhost
+app.use(cors({
+  origin: (origin, callback) => {
+    // Разреши на всички Vercel домейни и localhost
+    if (!origin || 
+        origin.includes('.vercel.app') || 
+        origin.includes('localhost') ||
+        origin.includes('127.0.0.1') ||
+        origin.includes('kidgame1backend.onrender.com')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
     }
-  }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'X-Requested-With', 'Accept']
+}));
 
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
-    return;
-  }
-  next();
-});
+// Добави OPTIONS handler за preflight requests
+app.options('*', cors());
 
 app.use((req, res, next) => {
   const start = Date.now();
