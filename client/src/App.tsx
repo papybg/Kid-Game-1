@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "./components/ui/toaster";
@@ -10,16 +10,24 @@ import Welcome from "./pages/welcome";
 import PortalSelection from "./pages/portal-selection";
 import Game from "./pages/game";
 import Win from "./pages/win";
+import AdminPage from "./pages/admin";
 
 import type { Portal } from "@shared/schema";
 
-type Screen = "welcome" | "portals" | "game" | "win";
+type Screen = "welcome" | "portals" | "game" | "win" | "admin";
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>("welcome");
   const [selectedPortal, setSelectedPortal] = useState<Portal | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [gameKey, setGameKey] = useState(0); // Key to force Game component remount
+
+  // Check for admin route on mount
+  useEffect(() => {
+    if (window.location.pathname === '/admin') {
+      setCurrentScreen('admin');
+    }
+  }, []);
 
   const handleEnterGame = () => {
     setCurrentScreen("portals");
@@ -62,6 +70,11 @@ function App() {
     setSettingsOpen(false);
   };
 
+  const handleGoToAdmin = () => {
+    setCurrentScreen("admin");
+    window.history.pushState(null, '', '/admin');
+  };
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="light" storageKey="kade-da-me-otkriesh-theme">
@@ -72,6 +85,7 @@ function App() {
                 <Welcome 
                   onEnterGame={handleEnterGame}
                   onOpenSettings={handleOpenSettings}
+                  onGoToAdmin={handleGoToAdmin}
                 />
               )}
               
@@ -97,6 +111,10 @@ function App() {
                   onNextLevel={handleNextLevel}
                   onBackToMenu={handleBackToMenu}
                 />
+              )}
+
+              {currentScreen === "admin" && (
+                <AdminPage />
               )}
             </div>
             

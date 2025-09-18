@@ -9,9 +9,10 @@ import { useSettingsStore, type GameMode } from "../lib/settings-store";
 interface WelcomeProps {
   onEnterGame: () => void;
   onOpenSettings: () => void;
+  onGoToAdmin: () => void;
 }
 
-export default function Welcome({ onEnterGame, onOpenSettings }: WelcomeProps) {
+export default function Welcome({ onEnterGame, onOpenSettings, onGoToAdmin }: WelcomeProps) {
   const { initializeAudio, playSound } = useAudioContext();
   const { setGameMode } = useSettingsStore();
   const [selectedMode, setSelectedMode] = useState<GameMode>('advanced');
@@ -121,6 +122,18 @@ export default function Welcome({ onEnterGame, onOpenSettings }: WelcomeProps) {
         data-testid="button-settings"
       >
         <Settings className="w-6 h-6" />
+      </Button>
+
+      {/* Admin Button */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={onGoToAdmin}
+        className="absolute top-4 left-4 w-12 h-12 bg-white/20 rounded-xl hover:bg-white/30 text-white"
+        data-testid="button-admin"
+        title="Админ панел"
+      >
+        <span className="text-lg">⚙️</span>
       </Button>
     </div>
   );
