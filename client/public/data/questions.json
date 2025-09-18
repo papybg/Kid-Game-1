@@ -1,0 +1,50 @@
+[
+  {
+    "id": "q1",
+    "portalId": "animals",
+    "parentQuestion": "Къде живее котето?",
+    "correctSlot": 1,
+    "wrongSlots": [2, 3, 4],
+    "objectSound": "cat"
+  },
+  {
+    "id": "q2",
+    "portalId": "animals",
+    "parentQuestion": "Къде плува рибката?",
+    "correctSlot": 2,
+    "wrongSlots": [1, 3, 4],
+    "objectSound": "fish"
+  },
+  {
+    "id": "q3",
+    "portalId": "animals",
+    "parentQuestion": "Къде лети птичката?",
+    "correctSlot": 3,
+    "wrongSlots": [1, 2, 4],
+    "objectSound": "bird"
+  },
+  {
+    "id": "q4",
+    "portalId": "vehicles",
+    "parentQuestion": "Къде се движи колата?",
+    "correctSlot": 1,
+    "wrongSlots": [2, 3, 4],
+    "objectSound": "car"
+  },
+  {
+    "id": "q5",
+    "portalId": "vehicles",
+    "parentQuestion": "Къде лети самолетът?",
+    "correctSlot": 2,
+    "wrongSlots": [1, 3, 4],
+    "objectSound": "plane"
+  },
+  {
+    "id": "q6",
+    "portalId": "vehicles",
+    "parentQuestion": "Къде плува лодката?",
+    "correctSlot": 3,
+    "wrongSlots": [1, 2, 4],
+    "objectSound": "boat"
+  }
+]
