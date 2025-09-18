@@ -28,8 +28,10 @@ const buildUrl = (path: string) => {
 
 
 const getQueryFn: QueryFunction = async ({ queryKey }) => {
-  // Join the parts of the query key to form a path, e.g., ['api', 'portals'] becomes 'api/portals'
-  const path = queryKey.join('/');
+  // Join the parts of the query key to form a path, converting all elements to strings
+  // e.g., ['api', 'portals'] becomes 'api/portals'
+  // e.g., ['api', {id: 1}] becomes 'api/[object Object]' (but should be avoided)
+  const path = queryKey.map(key => String(key)).join('/');
   
   // Build the full, correct URL
   const fullUrl = buildUrl(path);
