@@ -108,6 +108,11 @@ export function serveStatic(app: Express) {
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (req, res, next) => {
+    // Skip API routes - let them be handled by registered routes
+    if (req.path.startsWith('/api/')) {
+      return next();
+    }
+    
     const filePath = path.resolve(distPath, req.path.substring(1));
     
     // Check if the requested file exists
