@@ -75,8 +75,9 @@ export function serveStatic(app: Express) {
   // may place the files in slightly different paths, so accept the first
   // one that exists.
   const candidates = [
-    path.resolve(__dirname, "public"), // default when building to dist/public
     path.resolve(process.cwd(), "dist", "public"), // explicit project-root dist/public
+    path.resolve(__dirname, "..", "dist", "public"), // relative to server dir
+    path.resolve(__dirname, "public"), // default when building to dist/public
     path.resolve(__dirname, "..", "client", "dist"), // client/dist
     path.resolve(process.cwd(), "client", "dist"), // alternate client/dist
   ];
@@ -92,10 +93,30 @@ export function serveStatic(app: Express) {
     return;
   }
 
-  app.use(express.static(distPath));
+  console.log(`Serving static files from: ${distPath}`);
+
+  // Serve static files with higher priority
+  app.use(express.static(distPath, {
+    index: false, // Don't serve index.html for root requests
+    extensions: ['html', 'htm'] // Only serve these extensions for directory requests
+  }));
+
+  // Specific handling for images to ensure they're served correctly
+  app.use('/images', express.static(path.join(distPath, 'images'), {
+    maxAge: '1d' // Cache images for 1 day
+  }));
 
   // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+  app.use("*", (req, res, next) => {
+    const filePath = path.resolve(distPath, req.path.substring(1));
+    
+    // Check if the requested file exists
+    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+      // If it's a file, serve it
+      res.sendFile(filePath);
+    } else {
+      // Otherwise serve index.html for SPA routing
+      res.sendFile(path.resolve(distPath, "index.html"));
+    }
   });
 }
