@@ -95,33 +95,27 @@ export function serveStatic(app: Express) {
 
   console.log(`Serving static files from: ${distPath}`);
 
-  // Serve static files with higher priority
+  // Serve static files - let express handle file existence checks
   app.use(express.static(distPath, {
     index: false, // Don't serve index.html for root requests
-    extensions: ['html', 'htm'] // Only serve these extensions for directory requests
+    extensions: ['html', 'htm'],
+    maxAge: '1d' // Cache static files for 1 day
   }));
 
-  // Specific handling for images to ensure they're served correctly
+  // Special handling for images with longer cache
   app.use('/images', express.static(path.join(distPath, 'images'), {
-    maxAge: '1d' // Cache images for 1 day
+    maxAge: '7d', // Cache images for 7 days
+    fallthrough: false // Don't fall through to next middleware if file not found
   }));
 
-  // fall through to index.html if the file doesn't exist
+  // fall through to index.html for SPA routing, but skip API routes
   app.use("*", (req, res, next) => {
     // Skip API routes - let them be handled by registered routes
     if (req.path.startsWith('/api/')) {
       return next();
     }
-    
-    const filePath = path.resolve(distPath, req.path.substring(1));
-    
-    // Check if the requested file exists
-    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-      // If it's a file, serve it
-      res.sendFile(filePath);
-    } else {
-      // Otherwise serve index.html for SPA routing
-      res.sendFile(path.resolve(distPath, "index.html"));
-    }
+
+    // For all other routes, serve index.html for SPA
+    res.sendFile(path.resolve(distPath, "index.html"));
   });
 }
