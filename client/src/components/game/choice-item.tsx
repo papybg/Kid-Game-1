@@ -28,10 +28,9 @@ export function ChoiceItem({ item, isUsed, isDisabled, shouldDisappear, isSelect
         className={cn(
           "choice-item w-32 h-32 object-contain flex-shrink-0 transition-all duration-200 cursor-pointer",
           {
-            "used opacity-50 cursor-not-allowed": isUsed && !shouldDisappear,
-            "opacity-0 scale-0 pointer-events-none": shouldDisappear, // Disappear animation
+            "used opacity-50 cursor-not-allowed": isUsed,
             "opacity-50 cursor-not-allowed": isDisabled,
-            "hover:scale-110": !isUsed && !isDisabled && !shouldDisappear,
+            "hover:scale-110": !isUsed && !isDisabled,
             "ring-4 ring-yellow-400 ring-opacity-75 scale-110": isSelected, // Selected state styling
             "absolute z-50 transition-all duration-1000 ease-in-out": isAnimating, // Animation to target position
           },
