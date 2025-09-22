@@ -1,14 +1,15 @@
 import { db } from "./db";
 import { portals, gameItems, gameLayouts } from "../shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray, notInArray } from "drizzle-orm";
 
-// Helper function for random selection
+// --- КОРИГИРАНИ HELPER ФУНКЦИИ ---
+// Тази функция сега използва правилния Fisher-Yates shuffle отдолу.
 function selectRandom<T>(array: T[], count: number): T[] {
-  const shuffled = [...array].sort(() => 0.5 - Math.random());
+  const shuffled = shuffleArray(array);
   return shuffled.slice(0, count);
 }
 
-// Helper function for shuffling array (Fisher-Yates)
+// Fisher-Yates shuffle - това е перфектно, запазваме го.
 function shuffleArray<T>(array: T[]): T[] {
   const shuffled = [...array];
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -18,67 +19,92 @@ function shuffleArray<T>(array: T[]): T[] {
   return shuffled;
 }
 
+// --- ИНТЕРФЕЙСИ (ДОБРА ПРАКТИКА) ---
+// Дефинираме типове за по-голяма яснота в кода.
+type Cell = (typeof gameLayouts.$inferSelect)['slots'][number];
+type Item = typeof gameItems.$inferSelect;
+
 export interface GameSession {
-  cells: any[]; // Selected cells from layout
-  items: any[]; // Selected and shuffled items
+  cells: Cell[];
+  items: Item[];
   levelType: 'equals_cells' | 'cells_plus_two';
 }
 
+// --- ОСНОВНАТА ФУНКЦИЯ (ПРЕНАПИСАНА И ОПТИМИЗИРАНА) ---
 export async function generateGameSession(portalId: string): Promise<GameSession> {
-  // 1. Get portal settings
-  const portalResult = await db.select().from(portals).where(eq(portals.id, portalId));
-  if (portalResult.length === 0) {
+  // Стъпка 1: Вземи настройките на портала (без промяна)
+  const portal = await db.query.portals.findFirst({
+    where: eq(portals.id, portalId),
+  });
+  if (!portal) {
     throw new Error(`Portal with id ${portalId} not found`);
   }
-  const portal = portalResult[0];
 
-  // 2. Generate random cell count
+  // Стъпка 2: Генерирай случаен брой клетки (без промяна)
   const sessionCellCount = Math.floor(Math.random() * (portal.max_cells - portal.min_cells + 1)) + portal.min_cells;
 
-  // 3. Get all available cells from layout
-  const layoutResult = await db.select().from(gameLayouts).where(eq(gameLayouts.id, portal.layouts[0]));
-  if (layoutResult.length === 0) {
-    throw new Error(`Layout not found for portal ${portalId}`);
+  // Стъпка 3: Вземи layout-а и избери случайни клетки (без промяна)
+  const layout = await db.query.gameLayouts.findFirst({
+    where: eq(gameLayouts.id, portal.layouts[0]), // Предполагаме, че винаги има поне един layout
+  });
+  if (!layout || !layout.slots) {
+    throw new Error(`Layout or slots not found for portal ${portalId}`);
   }
-  const layout = layoutResult[0];
-
-  // 4. Select random cells
   const selectedCells = selectRandom(layout.slots, sessionCellCount);
 
-  // 5. Calculate item count based on rule
-  const itemCount = portal.item_count_rule === 'cells_plus_two'
-    ? sessionCellCount + 2
-    : sessionCellCount;
-
-  // 6. Get all game items
-  const allItems = await db.select().from(gameItems);
-
-  // 7. Select correct items (items that match selected cells)
-  // For now, we'll select random items that correspond to the cell indices
-  const cellIndices = selectedCells.flatMap(cell => cell.index);
-  const correctItems = allItems.filter(item => cellIndices.includes(item.index));
-
-  // If we don't have enough correct items, select random ones
-  const remainingCorrectCount = Math.min(sessionCellCount, correctItems.length);
-  const selectedCorrectItems = selectRandom(correctItems, remainingCorrectCount);
-
-  // 8. Select confusing items (if needed)
-  let confusingItems: any[] = [];
-  if (itemCount > selectedCorrectItems.length) {
-    const remainingItems = allItems.filter(item =>
-      !selectedCorrectItems.some(selected => selected.id === item.id)
-    );
-    const confusingCount = itemCount - selectedCorrectItems.length;
-    confusingItems = selectRandom(remainingItems, confusingCount);
+  // --- КОРИГИРАНА И ОПТИМИЗИРАНА ЛОГИКА ЗА ИЗБОР НА ПРЕДМЕТИ ---
+  
+  // Стъпка 4: Събери всички нужни индекси от избраните клетки
+  const requiredIndices = [...new Set(selectedCells.flatMap(cell => cell.index))];
+  if (requiredIndices.length === 0) {
+    throw new Error('Selected cells have no indices defined.');
   }
 
-  // 9. Combine and shuffle all items
-  const allSelectedItems = [...selectedCorrectItems, ...confusingItems];
-  const shuffledItems = shuffleArray(allSelectedItems);
+  // Стъпка 5: Изтегли САМО правилните предмети от базата (ОПТИМИЗАЦИЯ)
+  const correctItemsPool = await db.select().from(gameItems).where(inArray(gameItems.index, requiredIndices));
+  
+  // Стъпка 6: Избери по един предмет за всяка клетка (КОРЕКЦИЯ НА ЛОГИКАТА)
+  const selectedCorrectItems: Item[] = [];
+  const availableItems = [...correctItemsPool];
+  
+  for (const cell of selectedCells) {
+    const matchingItems = availableItems.filter(item => cell.index.includes(item.index));
+    if (matchingItems.length > 0) {
+      const randomItem = selectRandom(matchingItems, 1)[0];
+      selectedCorrectItems.push(randomItem);
+      // Премахваме избрания предмет, за да не го изберем отново
+      const indexToRemove = availableItems.findIndex(item => item.id === randomItem.id);
+      if (indexToRemove > -1) {
+        availableItems.splice(indexToRemove, 1);
+      }
+    }
+  }
+  // Ако няма достатъчно предмети за всички клетки, може да хвърлим грешка или да продължим с по-малко
+  if (selectedCorrectItems.length < sessionCellCount) {
+    console.warn(`Warning: Not enough unique items found for all cells. Found ${selectedCorrectItems.length}, needed ${sessionCellCount}`);
+  }
 
+  // Стъпка 7: Изчисли броя на всички предмети и избери "объркващи" (ОПТИМИЗАЦИЯ)
+  const totalItemCount = portal.item_count_rule === 'cells_plus_two'
+    ? sessionCellCount + 2
+    : sessionCellCount;
+  
+  let confusingItems: Item[] = [];
+  const neededConfusing = totalItemCount - selectedCorrectItems.length;
+
+  if (neededConfusing > 0) {
+    // Изтегли САМО предмети, които НЕ са правилни за тази дъска (ОПТИМИЗАЦИЯ)
+    const confusingItemsPool = await db.select().from(gameItems).where(notInArray(gameItems.index, requiredIndices));
+    confusingItems = selectRandom(confusingItemsPool, neededConfusing);
+  }
+
+  // Стъпка 8: Комбинирай и разбъркай (без промяна)
+  const finalItems = shuffleArray([...selectedCorrectItems, ...confusingItems]);
+
+  // Стъпка 9: Върни резултата (без промяна)
   return {
     cells: selectedCells,
-    items: shuffledItems,
-    levelType: portal.item_count_rule
+    items: finalItems,
+    levelType: portal.item_count_rule,
   };
 }
