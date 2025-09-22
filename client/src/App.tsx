@@ -99,7 +99,7 @@ function App() {
               {currentScreen === "game" && selectedPortal && (
                 <Game
                   key={gameKey}
-                  portal={selectedPortal}
+                  portalId={selectedPortal.id}
                   onBackToMenu={handleBackToMenu}
                   onWin={handleWin}
                 />

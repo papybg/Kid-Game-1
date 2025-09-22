@@ -288,16 +288,30 @@ export class MemStorage implements IStorage {
 }
 
 // Use database storage if DATABASE_URL is available, otherwise use memory storage
-let storageInstance: IStorage = new MemStorage(); // Default to memory storage
-
-if (process.env.DATABASE_URL) {
-  // Dynamically import DbStorage only when DATABASE_URL is available
-  import("./db-storage").then(({ DbStorage }) => {
-    storageInstance = new DbStorage();
-  }).catch((error) => {
-    console.warn("Failed to load database storage, falling back to memory storage:", error.message);
-    storageInstance = new MemStorage();
-  });
+async function createStorage(): Promise<IStorage> {
+  if (process.env.DATABASE_URL) {
+    console.log("Using database storage (PostgreSQL)");
+    const { DbStorage } = await import("./db-storage.js");
+    return new DbStorage();
+  } else {
+    console.log("Using memory storage");
+    return new MemStorage();
+  }
 }
 
-export const storage: IStorage = storageInstance;
+// Initialize storage
+let storageInstance: IStorage | null = null;
+
+export const getStorage = async (): Promise<IStorage> => {
+  if (!storageInstance) {
+    storageInstance = await createStorage();
+  }
+  return storageInstance;
+};
+
+// For backward compatibility
+export const storage: IStorage = new Proxy({} as IStorage, {
+  get: (target, prop) => {
+    throw new Error("Use getStorage() instead of direct storage access");
+  }
+});

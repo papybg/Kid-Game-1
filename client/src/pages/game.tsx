@@ -10,15 +10,16 @@ import { useGameState } from "../hooks/use-game-state";
 import { useAudioContext } from "../components/audio-manager";
 import { useSettingsStore } from "../lib/settings-store";
 import { generateChoicePool } from "../lib/game-logic";
+import { fetchGameSession } from "../lib/api";
 import type { Portal, GameLayout, GameItem } from "@shared/schema";
 
 interface GameProps {
-  portal: Portal;
+  portalId: string;
   onBackToMenu: () => void;
   onWin: () => void;
 }
 
-export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
+export default function Game({ portalId, onBackToMenu, onWin }: GameProps) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [previousPlacedItems, setPreviousPlacedItems] = useState<Record<string, GameItem>>({});
   const [disappearingItems, setDisappearingItems] = useState<Set<number>>(new Set()); // Track items that should disappear
@@ -45,19 +46,24 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
     removeCurrentSlot,
   } = useGameState();
 
-  // Fetch layout data
-  const { data: layout, isLoading: layoutLoading, error: layoutError } = useQuery<GameLayout>({
-    queryKey: ['api/layouts', portal.layouts[0]],
-    enabled: !!portal?.layouts?.[0],
-    retry: 2,
-    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+  // Fetch portal data
+  const { data: portal, isLoading: portalLoading, error: portalError } = useQuery({
+    queryKey: ['portals', portalId],
+    queryFn: async () => {
+      const response = await fetch(`http://localhost:3005/api/portals/${portalId}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch portal');
+      }
+      return response.json();
+    },
+    enabled: !!portalId,
   });
 
-  // Fetch game items
-  const { data: allItems, isLoading: itemsLoading, error: itemsError } = useQuery<GameItem[]>({
-    queryKey: ['api/game-items'],
-    retry: 2,
-    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+  // Fetch game session data
+  const { data: gameSession, isLoading: sessionLoading, error: sessionError } = useQuery({
+    queryKey: ['gameSession', portalId],
+    queryFn: () => fetchGameSession(portalId),
+    enabled: !!portalId,
   });
 
   useEffect(() => {
@@ -124,12 +130,23 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
   const activeSlot = gameState.availableSlots.length > 0 ? gameState.availableSlots[0] : null;
 
   useEffect(() => {
-    if (layout && allItems) {
-      const choiceItems = generateChoicePool(layout.slots, allItems);
-      startGame(portal, layout, choiceItems);
-      // Remove automatic start sound when game initializes
+    if (portal && gameSession) {
+      // Use the cells and items from game session
+      const choiceItems = gameSession.items;
+      // For layout, we'll need to get it from the cells or create a mock layout
+      // For now, create a simple layout from the cells
+      const mockLayout: GameLayout = {
+        id: portal.layouts[0],
+        name: 'Game Layout',
+        backgroundLarge: '/images/backgrounds/dolina-large.png',
+        backgroundSmall: '/images/backgrounds/dolina-small.png',
+        slots: gameSession.cells,
+        createdAt: new Date(),
+      };
+      
+      startGame(portal, mockLayout, choiceItems);
     }
-  }, [layout, allItems, portal, startGame]);
+  }, [gameSession, portal, startGame]);
 
   // Play animal sound when item enters cell - only for correct choices
   useEffect(() => {
@@ -272,25 +289,25 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
     }
   };
 
-  if (layoutLoading || itemsLoading) {
+  if (portalLoading || sessionLoading) {
     return (
       <div className="fixed inset-0 z-30 flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
           <LoadingSpinner size="lg" />
-          <p className="text-muted-foreground">Зарежда играта...</p>
+          <p className="text-muted-foreground">Зареждане на играта...</p>
         </div>
       </div>
     );
   }
 
-  if (layoutError || itemsError || !layout) {
+  if (portalError || sessionError) {
     return (
       <div className="fixed inset-0 z-30 flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
           <p className="text-destructive">Грешка при зареждане на нивото</p>
-          {(layoutError || itemsError) && (
+          {(portalError || sessionError) && (
             <p className="text-sm text-muted-foreground">
-              {layoutError?.message || itemsError?.message}
+              {(portalError instanceof Error ? portalError.message : '') || (sessionError instanceof Error ? sessionError.message : 'Unknown error')}
             </p>
           )}
           <Button onClick={onBackToMenu}>Назад към менюто</Button>
@@ -299,7 +316,7 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
     );
   }
 
-  const backgroundUrl = isMobile ? layout.backgroundSmall : layout.backgroundLarge;
+  const backgroundUrl = isMobile ? '/images/backgrounds/dolina-small.png' : '/images/backgrounds/dolina-large.png';
 
   return (
     <div className="fixed inset-0 z-30 w-screen h-screen">
@@ -325,7 +342,7 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
           </Button>
           
           <div className="text-center text-white">
-            <h1 className="font-display font-bold text-xl md:text-2xl">{portal.name}</h1>
+            <h1 className="font-display font-bold text-xl md:text-2xl">{portal!.portalName}</h1>
             <div className="text-sm bg-white/20 backdrop-blur-sm rounded-full px-4 py-1 mt-2 inline-block">
               {gameState.isPlaying
                 ? "Къде ще сложиш това"
@@ -360,11 +377,11 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
       {/* Game Slots Overlay */}
       <div className="absolute inset-0 z-10 pointer-events-none">
         {/* Game slots rendering based on game mode */}
-        {gameState.isPlaying && layout && (
+        {gameState.isPlaying && gameSession && (
           <>
             {gameMode === 'simple' ? (
               // Simple mode: Show ALL slots from the start
-              layout.slots.map((slot) => {
+              gameSession.cells.map((slot: any) => {
                 const slotId = `${slot.position.top}-${slot.position.left}`;
                 const isSlotActive = activeSlot && 
                   activeSlot.position.top === slot.position.top && 
@@ -398,7 +415,7 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
             {Object.entries(gameState.placedItems).map(([slotId, item]) => {
               // Find the original slot definition for positioning
               const [top, left] = slotId.split('-');
-              const originalSlot = layout.slots.find(s => s.position.top === top && s.position.left === left);
+              const originalSlot = gameSession.cells.find((s: any) => s.position.top === top && s.position.left === left);
               
               if (!originalSlot) return null;
               
@@ -505,7 +522,7 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
             <div
               className="bg-yellow-400 h-2 rounded-full transition-all duration-500"
               style={{
-                width: `${((layout.slots.length - gameState.availableSlots.length) / layout.slots.length) * 100}%`,
+              width: `${((gameSession!.cells.length - gameState.availableSlots.length) / gameSession!.cells.length) * 100}%`,
               }}
             />
           </div>

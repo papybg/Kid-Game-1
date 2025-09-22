@@ -1,13 +1,15 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { getStorage } from "./storage";
 import { insertUserProgressSchema, insertGameSettingsSchema } from "../shared/schema";
 import { z } from "zod";
+import { generateGameSession } from "./gameService";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Get all portals
   app.get("/api/portals", async (req, res) => {
     try {
+      const storage = await getStorage();
       const portals = await storage.getPortals();
       res.json(portals);
     } catch (error) {
@@ -18,6 +20,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get specific portal
   app.get("/api/portals/:id", async (req, res) => {
     try {
+      const storage = await getStorage();
       const portal = await storage.getPortal(req.params.id);
       if (!portal) {
         return res.status(404).json({ message: "Portal not found" });
@@ -31,6 +34,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all game items
   app.get("/api/game-items", async (req, res) => {
     try {
+      const storage = await getStorage();
       const items = await storage.getGameItems();
       res.json(items);
     } catch (error) {
@@ -41,6 +45,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get specific game layout
   app.get("/api/layouts/:id", async (req, res) => {
     try {
+      const storage = await getStorage();
       const layout = await storage.getGameLayout(req.params.id);
       if (!layout) {
         return res.status(404).json({ message: "Layout not found" });
@@ -54,6 +59,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get user progress
   app.get("/api/progress", async (req, res) => {
     try {
+      const storage = await getStorage();
       const progress = await storage.getUserProgress();
       res.json(progress);
     } catch (error) {
@@ -64,6 +70,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Save user progress
   app.post("/api/progress", async (req, res) => {
     try {
+      const storage = await getStorage();
       const validatedProgress = insertUserProgressSchema.parse(req.body);
       const progress = await storage.createUserProgress(validatedProgress);
       res.status(201).json(progress);
@@ -78,6 +85,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get game settings
   app.get("/api/settings", async (req, res) => {
     try {
+      const storage = await getStorage();
       const settings = await storage.getGameSettings();
       res.json(settings);
     } catch (error) {
@@ -88,6 +96,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update game settings
   app.patch("/api/settings", async (req, res) => {
     try {
+      const storage = await getStorage();
       const validatedSettings = insertGameSettingsSchema.partial().parse(req.body);
       const settings = await storage.updateGameSettings(validatedSettings);
       res.json(settings);
@@ -96,6 +105,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid settings data", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to update settings" });
+    }
+  });
+
+  // Generate dynamic game session
+  app.get("/api/game-session/:portalId", async (req, res) => {
+    try {
+      const { portalId } = req.params;
+      const sessionData = await generateGameSession(portalId);
+      res.json(sessionData);
+    } catch (error) {
+      console.error('Error generating game session:', error);
+      res.status(500).json({ error: 'Failed to generate game session' });
     }
   });
 

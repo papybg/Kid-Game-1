@@ -1,15 +1,22 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, jsonb, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, jsonb, integer, boolean, timestamp, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// Enums
+export const itemCountRuleEnum = pgEnum('item_count_rule', ['equals_cells', 'cells_plus_two']);
 
 // Game Portals
 export const portals = pgTable("portals", {
   id: varchar("id").primaryKey(),
-  name: text("name").notNull(),
-  icon: text("icon").notNull(),
+  portalName: text("portal_name").notNull(),
+  fileName: text("file_name").notNull(),
+  iconFileName: text("icon_file_name").notNull(),
   layouts: jsonb("layouts").notNull().$type<string[]>(),
-  difficulty: text("difficulty").notNull(),
+  cellCount: integer("cell_count").notNull(),
+  min_cells: integer("min_cells").notNull(),
+  max_cells: integer("max_cells").notNull(),
+  item_count_rule: itemCountRuleEnum("item_count_rule").notNull(),
   isLocked: boolean("is_locked").default(false),
   createdAt: timestamp("created_at").default(sql`now()`),
 });
@@ -19,8 +26,17 @@ export const gameItems = pgTable("game_items", {
   id: integer("id").primaryKey(),
   name: text("name").notNull(),
   image: text("image").notNull(),
-  index: text("index").notNull(),
+  index: varchar("index", { length: 2 }).notNull(), // Allow 2 characters
   category: text("category"),
+  createdAt: timestamp("created_at").default(sql`now()`),
+});
+
+// Categories and their corresponding indices
+export const categoriesIndices = pgTable("categories_indices", {
+  id: integer("id").primaryKey(),
+  categoryName: text("category_name").notNull(),
+  indexValue: varchar("index_value", { length: 2 }).notNull(),
+  description: text("description"),
   createdAt: timestamp("created_at").default(sql`now()`),
 });
 
@@ -67,6 +83,7 @@ export const insertGameItemSchema = createInsertSchema(gameItems);
 export const insertGameLayoutSchema = createInsertSchema(gameLayouts);
 export const insertUserProgressSchema = createInsertSchema(userProgress);
 export const insertGameSettingsSchema = createInsertSchema(gameSettings);
+export const insertCategoriesIndicesSchema = createInsertSchema(categoriesIndices);
 
 // Types
 export type Portal = typeof portals.$inferSelect;
@@ -74,12 +91,14 @@ export type GameItem = typeof gameItems.$inferSelect;
 export type GameLayout = typeof gameLayouts.$inferSelect;
 export type UserProgress = typeof userProgress.$inferSelect;
 export type GameSettings = typeof gameSettings.$inferSelect;
+export type CategoryIndex = typeof categoriesIndices.$inferSelect;
 
 export type InsertPortal = z.infer<typeof insertPortalSchema>;
 export type InsertGameItem = z.infer<typeof insertGameItemSchema>;
 export type InsertGameLayout = z.infer<typeof insertGameLayoutSchema>;
 export type InsertUserProgress = z.infer<typeof insertUserProgressSchema>;
 export type InsertGameSettings = z.infer<typeof insertGameSettingsSchema>;
+export type InsertCategoryIndex = z.infer<typeof insertCategoriesIndicesSchema>;
 
 // Game-specific types
 export interface GameSlot {
@@ -106,4 +125,14 @@ export interface FeedbackMessage {
   type: 'success' | 'error';
   message: string;
   isVisible: boolean;
+}
+
+export interface GameSession {
+  cells: Array<{
+    index: string[];
+    position: { top: string; left: string };
+    diameter: string;
+  }>;
+  items: GameItem[];
+  levelType: 'equals_cells' | 'cells_plus_two';
 }

@@ -1,8 +1,12 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
+import { config } from "dotenv";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { getDirname } from "./utils";
+
+// Load environment variables
+config();
 
 const __dirname = getDirname(import.meta.url);
 
@@ -13,7 +17,6 @@ app.use(express.urlencoded({ extended: false }));
 // CORS настройки - разреши всички Vercel домейни и localhost
 app.use(cors({
   origin: (origin, callback) => {
-    // Разреши на всички Vercel домейни и localhost
     if (!origin || 
         origin.includes('.vercel.app') || 
         origin.includes('localhost') ||
@@ -50,11 +53,9 @@ app.use((req, res, next) => {
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
-
       if (logLine.length > 80) {
         logLine = logLine.slice(0, 79) + "…";
       }
-
       log(logLine);
     }
   });
@@ -62,40 +63,31 @@ app.use((req, res, next) => {
   next();
 });
 
+// --- ВРЕМЕНЕН БЛОК САМО ЗА ТЕСТ ---
 (async () => {
+  console.log("--- Starting BARE BONES server test ---");
+
+  // Предполагаме, че registerRoutes връща http.Server инстанция
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-
+    console.error("❌ An error occurred:", err.stack);
     res.status(status).json({ message });
-    throw err;
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    try {
-      serveStatic(app);
-    } catch (err) {
-      // Do not crash the process if the client build is missing. Start the API only.
-      console.warn(
-        "Warning: serveStatic failed — starting API without client static files.",
-        err instanceof Error ? err.message : err,
-      );
-    }
-  }
-
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '3005', 10);
+
+  // Игнорираме Vite и статичните файлове. Опитваме се да стартираме само API сървъра.
   server.listen(port, () => {
-    log(`serving on port ${port}`);
+    console.log(`✅ [express] BARE BONES server is listening on port ${port}`);
+    console.log(`🚀 Now, try to open http://localhost:${port}/api/game-session/d1 in your browser.`);
   });
+
+  server.on('error', (error) => {
+    console.error('❌ [express] BARE BONES server failed to start with an error:', error);
+  });
+
 })();
+// --- КРАЙ НА ВРЕМЕННИЯ КОД ---

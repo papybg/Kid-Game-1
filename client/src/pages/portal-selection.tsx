@@ -14,7 +14,14 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
   const { theme, setTheme } = useTheme();
 
   const { data: portals = [], isLoading, error } = useQuery<Portal[]>({
-    queryKey: ['api/portals'],
+    queryKey: ['portals'],
+    queryFn: async () => {
+      const response = await fetch('http://localhost:3005/api/portals');
+      if (!response.ok) {
+        throw new Error('Failed to fetch portals');
+      }
+      return response.json();
+    },
     retry: 2,
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes
   });
@@ -94,13 +101,13 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
             >
               <div className="relative">
                 <img
-                  src={portal.icon}
-                  alt={portal.name}
+                  src={`/images/backgrounds/${portal.fileName}.png`}
+                  alt={portal.portalName}
                   className="w-full h-48 object-contain"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
                 <div className="absolute bottom-4 left-4 text-white">
-                  <h3 className="font-display font-semibold text-xl">{portal.name}</h3>
+                  <h3 className="font-display font-semibold text-xl">{portal.portalName}</h3>
                   <p className="text-sm text-gray-200">Открий животните в природата</p>
                 </div>
                 <div className="absolute top-4 right-4 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">

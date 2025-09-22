@@ -1,7 +1,7 @@
 {
   "portals": [
     {
-      "id": "dolina",
+      "id": "d1",
       "name": "Зелена долина",
       "icon": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&h=200",
       "layouts": ["d1"],

@@ -1,0 +1,1 @@
+ALTER TABLE "portals" DROP COLUMN "difficulty";
