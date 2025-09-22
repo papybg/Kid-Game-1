@@ -377,7 +377,7 @@ export default function Game({ portalId, onBackToMenu, onWin }: GameProps) {
       {/* Game Slots Overlay */}
       <div className="absolute inset-0 z-10 pointer-events-none">
         {/* Game slots rendering based on game mode */}
-        {(gameState.isPlaying || isGameComplete) && gameSession && (
+        {gameSession && (
           <>
             {gameMode === 'simple' ? (
               // Simple mode: Show ALL slots from the start
