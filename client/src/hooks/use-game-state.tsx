@@ -192,7 +192,7 @@ export function useGameState() {
     localStorage.removeItem('gameState');
   }, []);
 
-  const isGameComplete = gameState.startTime > 0 && gameState.availableSlots.length === 0 && !gameState.isPlaying;
+  const isGameComplete = gameState.startTime > 0 && gameState.availableSlots.length === 0 && !gameState.isPlaying && Object.keys(gameState.placedItems).length > 0;
   const timeElapsed = gameState.startTime ? Math.floor((Date.now() - gameState.startTime) / 1000) : 0;
 
   return {
