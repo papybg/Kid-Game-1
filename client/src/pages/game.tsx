@@ -400,14 +400,38 @@ export default function Game({ portalId, onBackToMenu, onWin }: GameProps) {
                 );
               })
             ) : (
-              // Advanced mode: Show only active slot
-              activeSlot && (
-                <GameSlotComponent
-                  key={`${activeSlot.position.top}-${activeSlot.position.left}`}
-                  slot={activeSlot}
-                  isActive={true}
-                  className="pointer-events-auto"
-                />
+              // Advanced mode: Show only active slot, or all slots when game is complete
+              (activeSlot || isGameComplete) && (
+                <>
+                  {isGameComplete ? (
+                    // When game is complete, show all slots like Simple mode
+                    gameSession.cells.map((slot: any) => {
+                      const slotId = `${slot.position.top}-${slot.position.left}`;
+                      const placedItem = gameState.placedItems[slotId];
+
+                      return (
+                        <GameSlotComponent
+                          key={slotId}
+                          slot={slot}
+                          isActive={false}
+                          isCompleted={!!placedItem}
+                          placedItem={placedItem}
+                          className="pointer-events-auto"
+                        />
+                      );
+                    })
+                  ) : (
+                    // During gameplay, show only active slot
+                    activeSlot && (
+                      <GameSlotComponent
+                        key={`${activeSlot.position.top}-${activeSlot.position.left}`}
+                        slot={activeSlot}
+                        isActive={true}
+                        className="pointer-events-auto"
+                      />
+                    )
+                  )}
+                </>
               )
             )}
 
