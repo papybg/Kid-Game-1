@@ -177,7 +177,7 @@ export default function Game({ portalId, onBackToMenu, onWin }: GameProps) {
   };
 
   const handleChoiceClick = (item: GameItem) => {
-    if (gameState.usedItems.includes(item.id) || isAudioPlaying) return;
+    if (gameState.usedItems.includes(item.id) || isAudioPlaying || isGameComplete) return;
 
     playSound('click');
 
@@ -377,7 +377,7 @@ export default function Game({ portalId, onBackToMenu, onWin }: GameProps) {
       {/* Game Slots Overlay */}
       <div className="absolute inset-0 z-10 pointer-events-none">
         {/* Game slots rendering based on game mode */}
-        {gameState.isPlaying && gameSession && (
+        {(gameState.isPlaying || isGameComplete) && gameSession && (
           <>
             {gameMode === 'simple' ? (
               // Simple mode: Show ALL slots from the start
