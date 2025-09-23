@@ -14,7 +14,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// CORS настройки - разреши всички Vercel домейни и localhost
+// CORS настройки
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || 
@@ -32,7 +32,6 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'X-Requested-With', 'Accept']
 }));
 
-// Добави OPTIONS handler за preflight requests
 app.options('*', cors());
 
 app.use((req, res, next) => {
@@ -63,11 +62,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// --- ВРЕМЕНЕН БЛОК САМО ЗА ТЕСТ ---
+// Основен блок за стартиране на приложението
 (async () => {
-  console.log("--- Starting BARE BONES server test ---");
-
-  // Предполагаме, че registerRoutes връща http.Server инстанция
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -79,15 +75,23 @@ app.use((req, res, next) => {
 
   const port = parseInt(process.env.PORT || '3005', 10);
 
-  // Игнорираме Vite и статичните файлове. Опитваме се да стартираме само API сървъра.
-  server.listen(port, () => {
-    console.log(`✅ [express] BARE BONES server is listening on port ${port}`);
-    console.log(`🚀 Now, try to open http://localhost:${port}/api/game-session/d1 in your browser.`);
-  });
-
-  server.on('error', (error) => {
-    console.error('❌ [express] BARE BONES server failed to start with an error:', error);
-  });
-
+  if (process.env.NODE_ENV === "development") {
+    // В DEVELOPMENT режим, setupVite се грижи за всичко, включително стартирането.
+    log("Starting in development mode...");
+    await setupVite(app, server);
+  } else {
+    // В PRODUCTION режим, ние стартираме сървъра ръчно.
+    log("Starting in production mode...");
+    try {
+      serveStatic(app);
+    } catch (err) {
+      console.warn(
+        "Warning: serveStatic failed — starting API without client static files.",
+        err instanceof Error ? err.message : err,
+      );
+    }
+    server.listen(port, () => {
+      log(`✅ [express] Server is running and successfully listening on port ${port}`);
+    });
+  }
 })();
-// --- КРАЙ НА ВРЕМЕННИЯ КОД ---

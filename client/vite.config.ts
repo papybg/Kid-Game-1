@@ -16,4 +16,14 @@ export default defineConfig({
   server: {
     port: 8080, // Добавяме това, за да сме сигурни, че винаги ще стартира на порт 8080
   },
+  preview: {
+    port: 8080,
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: undefined,
+      },
+    },
+  },
 })

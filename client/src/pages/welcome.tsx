@@ -28,7 +28,7 @@ export default function Welcome({ onEnterGame, onOpenSettings, onGoToAdmin }: We
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-700 animate-fade-in">
-      <div className="text-center space-y-8 max-w-md mx-auto">
+      <div className="text-center space-y-6 sm:space-y-8 max-w-sm sm:max-w-md mx-auto px-2">
         {/* App Icon */}
         <div className="mx-auto w-24 h-24 bg-white/20 rounded-3xl flex items-center justify-center backdrop-blur-sm animate-bounce-in">
           <Brain className="w-12 h-12 text-white" />

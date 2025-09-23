@@ -112,7 +112,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/game-session/:portalId", async (req, res) => {
     try {
       const { portalId } = req.params;
-      const sessionData = await generateGameSession(portalId);
+      const deviceType = (req.query.device as 'desktop' | 'mobile') || 'desktop';
+      const gameMode = (req.query.mode as 'simple' | 'advanced') || 'simple';
+      const sessionData = await generateGameSession(portalId, deviceType, gameMode);
       res.json(sessionData);
     } catch (error) {
       console.error('Error generating game session:', error);

@@ -22,11 +22,25 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [gameKey, setGameKey] = useState(0); // Key to force Game component remount
 
-  // Check for admin route on mount
+  // Check for admin route on mount and handle URL changes
   useEffect(() => {
-    if (window.location.pathname === '/admin') {
-      setCurrentScreen('admin');
-    }
+    const handleRoute = () => {
+      if (window.location.pathname === '/admin') {
+        setCurrentScreen('admin');
+      } else {
+        setCurrentScreen('welcome');
+      }
+    };
+
+    // Check on mount
+    handleRoute();
+
+    // Listen for popstate (back/forward buttons)
+    window.addEventListener('popstate', handleRoute);
+    
+    return () => {
+      window.removeEventListener('popstate', handleRoute);
+    };
   }, []);
 
   const handleEnterGame = () => {

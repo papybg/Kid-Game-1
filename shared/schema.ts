@@ -46,7 +46,12 @@ export const gameLayouts = pgTable("game_layouts", {
   name: text("name").notNull(),
   backgroundLarge: text("background_large").notNull(),
   backgroundSmall: text("background_small").notNull(),
-  slots: jsonb("slots").notNull().$type<Array<{
+  slots_desktop: jsonb("slots_desktop").notNull().$type<Array<{
+    index: string[];
+    position: { top: string; left: string };
+    diameter: string;
+  }>>(),
+  slots_mobile: jsonb("slots_mobile").$type<Array<{
     index: string[];
     position: { top: string; left: string };
     diameter: string;

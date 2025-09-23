@@ -43,6 +43,13 @@
       "when": 1758494176590,
       "tag": "0005_natural_the_captain",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1758570476550,
+      "tag": "0006_natural_green_goblin",
+      "breakpoints": true
     }
   ]
 }

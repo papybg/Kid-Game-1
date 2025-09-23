@@ -2,12 +2,12 @@ import { cn } from "../ui/utils";
 import type { FeedbackMessage } from "@shared/types";
 
 interface FeedbackMessageProps {
-  feedback: FeedbackMessage;
+  feedback: FeedbackMessage | null;
   className?: string;
 }
 
 export function FeedbackMessageComponent({ feedback, className }: FeedbackMessageProps) {
-  if (!feedback.isVisible) return null;
+  if (!feedback || !feedback.isVisible) return null;
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
