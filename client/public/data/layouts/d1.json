@@ -15,7 +15,7 @@
       "diameter": "11%"
     },
     {
-      "index": ["p", "h"],
+      "index": ["h", "p"],
       "position": { "top": "70%", "left": "80%" },
       "diameter": "11%"
     },
@@ -30,7 +30,7 @@
       "diameter": "11%"
     },
     {
-      "index": ["p"],
+      "index": ["p", "h"],
       "position": { "top": "72%", "left": "92%" },
       "diameter": "11%"
     }

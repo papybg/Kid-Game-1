@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, jsonb, integer, boolean, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, jsonb, integer, boolean, timestamp, pgEnum, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -23,9 +23,10 @@ export const portals = pgTable("portals", {
 
 // Game Items/Themes
 export const gameItems = pgTable("game_items", {
-  id: integer("id").primaryKey(),
+  id: serial("id").primaryKey(),
   name: text("name").notNull(),
-  image: text("image").notNull(),
+  image: text("image"),
+  audio: text("audio"),
   index: varchar("index", { length: 2 }).notNull(), // Allow 2 characters
   category: text("category"),
   createdAt: timestamp("created_at").default(sql`now()`),
@@ -84,11 +85,21 @@ export const gameSettings = pgTable("game_settings", {
 
 // Insert schemas
 export const insertPortalSchema = createInsertSchema(portals);
-export const insertGameItemSchema = createInsertSchema(gameItems);
+export const insertGameItemSchema = z.object({
+  name: z.string(),
+  index: z.string(),
+  category: z.string().nullable(),
+  image: z.string().nullable(),
+  audio: z.string().nullable(),
+});
 export const insertGameLayoutSchema = createInsertSchema(gameLayouts);
 export const insertUserProgressSchema = createInsertSchema(userProgress);
 export const insertGameSettingsSchema = createInsertSchema(gameSettings);
-export const insertCategoriesIndicesSchema = createInsertSchema(categoriesIndices);
+export const insertCategoriesIndicesSchema = z.object({
+  categoryName: z.string(),
+  indexValue: z.string(),
+  description: z.string().optional(),
+});
 
 // Types
 export type Portal = typeof portals.$inferSelect;
@@ -140,4 +151,5 @@ export interface GameSession {
   }>;
   items: GameItem[];
   levelType: 'equals_cells' | 'cells_plus_two';
+  layout: GameLayout;
 }

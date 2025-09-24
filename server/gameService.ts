@@ -25,7 +25,7 @@ export interface GameSession {
   cells: Cell[];
   items: Item[];
   levelType: 'equals_cells' | 'cells_plus_two';
-  layout: Layout; // <-- ДОБАВЕНО ПОЛЕ ЗА ФОНА
+  layout: Layout;
 }
 
 export async function generateGameSession(portalId: string, deviceType: 'desktop' | 'mobile' = 'desktop', gameMode: 'simple' | 'advanced' = 'simple'): Promise<GameSession> {
@@ -47,6 +47,7 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
   if (requiredIndices.length === 0) throw new Error('Selected cells have no indices defined.');
 
   const correctItemsPool = await db.select().from(gameItems).where(inArray(gameItems.index, requiredIndices));
+  
   const selectedCorrectItems: Item[] = [];
   const availableItems = [...correctItemsPool];
   for (const cell of selectedCells) {
@@ -73,11 +74,11 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
 
   const finalItems = shuffleArray([...selectedCorrectItems, ...confusingItems]);
 
-  // КОРЕКЦИЯ: Добавяме 'layout' към връщания обект
+  // КОРЕКЦИЯ: Добавяме 'layout' и 'usedItemIds' към връщания обект
   return {
     cells: selectedCells,
     items: finalItems,
     levelType: gameMode === 'advanced' ? 'cells_plus_two' : 'equals_cells',
-    layout: layout, // <-- ТАЗИ ПРОМЯНА ОПРАВЯ ЛИПСВАЩИЯ ФОН
+    layout: layout,
   };
 }

@@ -25,8 +25,8 @@ export interface CreateItemData {
   audio?: File; // Добавяме звук към CreateItemData
 }
 
-// API база URL - използваме тест сървъра на порт 3007
-const API_BASE = "http://localhost:3007/api/admin";
+// API база URL - използваме основния сървър на порт 3005
+const API_BASE = "http://localhost:3005/api/admin";
 
 // GET всички items
 export const useAdminItems = () => {
@@ -103,6 +103,9 @@ export const useUpdateItem = () => {
       if (data.image) {
         formData.append("image", data.image);
       }
+      if (data.audio) {
+        formData.append("audio", data.audio);
+      }
 
       const response = await fetch(`${API_BASE}/items/${id}`, {
         method: "PUT",
@@ -116,6 +119,33 @@ export const useUpdateItem = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-items"] });
+    },
+  });
+};
+
+// POST нов category index
+export const useCreateCategoryIndex = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (data: { categoryName: string; indexValue: string; description?: string }): Promise<CategoryIndex> => {
+      const response = await fetch(`${API_BASE}/categories`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to create category index: ${errorText}`);
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      // Refresh categories list
+      queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
     },
   });
 };

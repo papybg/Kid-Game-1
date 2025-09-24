@@ -2,96 +2,40 @@ import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { config } from "dotenv";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
-import { getDirname } from "./utils";
+import adminRoutes from "./adminRoutes";
 
-// Load environment variables
 config();
-
-const __dirname = getDirname(import.meta.url);
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// CORS настройки
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || 
-        origin.includes('.vercel.app') || 
-        origin.includes('localhost') ||
-        origin.includes('127.0.0.1') ||
-        origin.includes('kidgame1backend.onrender.com')) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'X-Requested-With', 'Accept']
-}));
+// За локална разработка, позволяваме заявки от Vite сървъра на порт 8080 и 8081
+app.use(cors({ origin: ['http://localhost:8080', 'http://localhost:8081'], credentials: true }));
 
-app.options('*', cors());
+// registerRoutes вече не е async и не връща сървър. Просто добавя маршрутите.
+registerRoutes(app);
 
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+// Добави admin routes
+console.log('Setting up admin routes...');
+app.use('/api/admin', adminRoutes);
+console.log('Admin routes registered');
 
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
-
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-      log(logLine);
-    }
-  });
-
-  next();
+// Test route
+app.get('/test', (req, res) => {
+  res.json({ message: 'Server is working!' });
 });
 
-// Основен блок за стартиране на приложението
-(async () => {
-  const server = await registerRoutes(app);
+// Commented out error handler to test
+// app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+//     const status = err.status || err.statusCode || 500;
+//     const message = err.message || "Internal Server Error";
+//     console.error("❌ An error occurred:", err.stack);
+//     res.status(status).json({ message });
+// });
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-    console.error("❌ An error occurred:", err.stack);
-    res.status(status).json({ message });
-  });
+const port = parseInt(process.env.PORT || '3005');
 
-  const port = parseInt(process.env.PORT || '3005', 10);
-
-  if (process.env.NODE_ENV === "development") {
-    // В DEVELOPMENT режим, setupVite се грижи за всичко, включително стартирането.
-    log("Starting in development mode...");
-    await setupVite(app, server);
-  } else {
-    // В PRODUCTION режим, ние стартираме сървъра ръчно.
-    log("Starting in production mode...");
-    try {
-      serveStatic(app);
-    } catch (err) {
-      console.warn(
-        "Warning: serveStatic failed — starting API without client static files.",
-        err instanceof Error ? err.message : err,
-      );
-    }
-    server.listen(port, () => {
-      log(`✅ [express] Server is running and successfully listening on port ${port}`);
-    });
-  }
-})();
+app.listen(port, '127.0.0.1', () => {
+  console.log(`✅ [express] API server is listening on http://localhost:${port}`);
+});

@@ -10,7 +10,7 @@ import { useGameState } from "../hooks/use-game-state";
 import { useAudioContext } from "../components/audio-manager";
 import { useSettingsStore } from "../lib/settings-store";
 import { fetchGameSession } from "../lib/api";
-import type { GameItem, Slot } from "@shared/schema";
+import type { GameItem, GameSlot as Slot } from "@shared/schema";
 
 interface GameProps {
   portalId: string;
@@ -35,7 +35,7 @@ export default function Game({ portalId, onBackToMenu, onWin }: GameProps) {
     queryFn: () => fetchGameSession(portalId, isMobile ? 'mobile' : 'desktop', gameMode),
     enabled: !!portalId,
   });
-  
+
   const {
     gameState,
     feedback,
@@ -108,23 +108,21 @@ export default function Game({ portalId, onBackToMenu, onWin }: GameProps) {
         setAnimatingItem(null);
         setIsAnimationInProgress(false);
 
-        if (isWinningMove) {
-          playSound('bell');
-          const finalAnimalSound = playAnimalSound(itemToPlace.name, 1000);
-          if (finalAnimalSound) {
-            finalAnimalSound.onended = () => makeChoice(itemToPlace, targetSlot, isSimpleMode);
-          } else {
-            setTimeout(() => makeChoice(itemToPlace, targetSlot, isSimpleMode), 1000);
-          }
-        } else {
-          const isValid = makeChoice(itemToPlace, targetSlot, isSimpleMode);
-          if (isValid) {
+          if (isWinningMove) {
             playSound('bell');
-            playAnimalSound(itemToPlace.name, 1000);
-          }
-        }
-        
-        if (isSimpleMode) setSelectedItem(null);
+            const finalAnimalSound = playAnimalSound(itemToPlace, 0); // Без delay за winning move
+            if (finalAnimalSound) {
+              finalAnimalSound.onended = () => makeChoice(itemToPlace, targetSlot, isSimpleMode);
+            } else {
+              setTimeout(() => makeChoice(itemToPlace, targetSlot, isSimpleMode), 1000);
+            }
+          } else {
+            const isValid = makeChoice(itemToPlace, targetSlot, isSimpleMode);
+            if (isValid) {
+              playSound('bell');
+              playAnimalSound(itemToPlace, 1000);
+            }
+          }        if (isSimpleMode) setSelectedItem(null);
       }, 1000);
     };
 

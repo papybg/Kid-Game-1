@@ -8,11 +8,11 @@ const router = Router();
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     if (file.fieldname === 'image') {
-      cb(null, 'client/public/uploads/images/');
+      cb(null, 'client/public/images/');
     } else if (file.fieldname === 'audio') {
-      cb(null, 'client/public/uploads/audio/');
+      cb(null, 'client/public/audio/');
     } else {
-      cb(null, 'client/public/uploads/');
+      cb(null, 'client/public/');
     }
   },
   filename: (req, file, cb) => {
@@ -95,8 +95,8 @@ router.post('/items', upload.fields([
   const newItem = {
     id: Date.now(),
     name: req.body.name || 'New Item',
-    image: files?.image?.[0] ? `/uploads/images/${files.image[0].filename}` : null,
-    audio: files?.audio?.[0] ? `/uploads/audio/${files.audio[0].filename}` : null,
+    image: files?.image?.[0] ? `/images/${files.image[0].filename}` : null,
+    audio: files?.audio?.[0] ? `/audio/${files.audio[0].filename}` : null,
     index: req.body.index || 'x',
     category: req.body.category || 'mock'
   };

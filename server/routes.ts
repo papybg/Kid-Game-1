@@ -1,11 +1,10 @@
 import type { Express } from "express";
-import { createServer, type Server } from "http";
 import { getStorage } from "./storage";
 import { insertUserProgressSchema, insertGameSettingsSchema } from "../shared/schema";
 import { z } from "zod";
 import { generateGameSession } from "./gameService";
 
-export async function registerRoutes(app: Express): Promise<Server> {
+export function registerRoutes(app: Express): void {
   // Get all portals
   app.get("/api/portals", async (req, res) => {
     try {
@@ -121,7 +120,4 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: 'Failed to generate game session' });
     }
   });
-
-  const httpServer = createServer(app);
-  return httpServer;
 }

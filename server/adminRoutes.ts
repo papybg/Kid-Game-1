@@ -2,7 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
 import { db } from './db';
-import { gameItems, insertGameItemSchema } from '../shared/schema';
+import { gameItems, insertGameItemSchema, categoriesIndices, insertCategoriesIndicesSchema } from '../shared/schema';
 import { eq } from 'drizzle-orm';
 
 const router = Router();
@@ -10,7 +10,13 @@ const router = Router();
 // Настройка на multer за uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'client/public/uploads/');
+    if (file.fieldname === 'image') {
+      cb(null, 'client/public/images/');
+    } else if (file.fieldname === 'audio') {
+      cb(null, 'client/public/audio/');
+    } else {
+      cb(null, 'client/public/');
+    }
   },
   filename: (req, file, cb) => {
     // Генерирай уникално име: timestamp + оригинално име
@@ -22,22 +28,24 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   fileFilter: (req, file, cb) => {
-    // Позволи само картинки
-    if (file.mimetype.startsWith('image/')) {
+    // Позволи картинки и аудио файлове
+    if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('audio/')) {
       cb(null, true);
     } else {
-      cb(new Error('Само картинки са позволени!'));
+      cb(new Error('Само картинки и аудио файлове са позволени!'));
     }
   },
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB лимит
+    fileSize: 10 * 1024 * 1024 // 10MB лимит
   }
 });
 
 // GET /api/admin/items - вземи всички предмети
 router.get('/items', async (req, res) => {
+  console.log('GET /api/admin/items called');
   try {
     const items = await db.select().from(gameItems).orderBy(gameItems.id);
+    console.log('Found items:', items.length);
     res.json(items);
   } catch (error) {
     console.error('Error fetching items:', error);
@@ -45,21 +53,72 @@ router.get('/items', async (req, res) => {
   }
 });
 
-// POST /api/admin/items - създай нов предмет
-router.post('/items', upload.single('image'), async (req, res) => {
+// GET /api/admin/categories - вземи всички категории и индекси
+router.get('/categories', async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'Няма качен файл' });
-    }
+    const categories = await db.select().from(categoriesIndices).orderBy(categoriesIndices.id);
+    res.json(categories);
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    res.status(500).json({ error: 'Failed to fetch categories' });
+  }
+});
 
+// POST /api/admin/categories - създай нова категория индекс
+router.post('/categories', async (req, res) => {
+  try {
+    const { categoryName, indexValue, description } = req.body;
+
+    // Валидирай
+    const validatedData = insertCategoriesIndicesSchema.parse({
+      categoryName,
+      indexValue,
+      description
+    });
+
+    // Генерирай следващо ID
+    const existingCategories = await db.select().from(categoriesIndices);
+    const nextId = existingCategories.length > 0 ? Math.max(...existingCategories.map(c => c.id)) + 1 : 1;
+
+    // Запиши в базата с ръчно ID
+    const newCategory = await db.insert(categoriesIndices).values({
+      id: nextId,
+      categoryName: validatedData.categoryName,
+      indexValue: validatedData.indexValue,
+      description: validatedData.description
+    }).returning();
+
+    res.status(201).json(newCategory[0]);
+  } catch (error) {
+    console.error('Error creating category:', error);
+    if (error instanceof Error) {
+      res.status(400).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: 'Failed to create category' });
+    }
+  }
+});
+
+// POST /api/admin/items - създай нов предмет
+router.post('/items', upload.fields([
+  { name: 'image', maxCount: 1 },
+  { name: 'audio', maxCount: 1 }
+]), async (req, res) => {
+  try {
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+    
     const { name, index, category } = req.body;
+
+    console.log('Received req.body:', req.body);
+    console.log('Received files:', files);
 
     // Валидирай данните
     const validatedData = insertGameItemSchema.parse({
       name,
       index,
       category,
-      image: `/uploads/${req.file.filename}` // Пътят до файла
+      image: files?.image?.[0] ? `/images/${files.image[0].filename}` : null,
+      audio: files?.audio?.[0] ? `/audio/${files.audio[0].filename}` : null
     });
 
     // Запиши в базата
@@ -68,11 +127,17 @@ router.post('/items', upload.single('image'), async (req, res) => {
     res.status(201).json(newItem[0]);
   } catch (error) {
     console.error('Error creating item:', error);
+    console.error('Error details:', error instanceof Error ? error.message : error);
 
-    // Изтрий качения файл ако има грешка
-    if (req.file) {
+    // Изтрий качените файлове ако има грешка
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+    if (files?.image?.[0]) {
       const fs = await import('fs');
-      fs.unlinkSync(req.file.path);
+      fs.unlinkSync(files.image[0].path);
+    }
+    if (files?.audio?.[0]) {
+      const fs = await import('fs');
+      fs.unlinkSync(files.audio[0].path);
     }
 
     if (error instanceof Error) {
@@ -84,10 +149,14 @@ router.post('/items', upload.single('image'), async (req, res) => {
 });
 
 // PUT /api/admin/items/:id - редактирай предмет
-router.put('/items/:id', upload.single('image'), async (req, res) => {
+router.put('/items/:id', upload.fields([
+  { name: 'image', maxCount: 1 },
+  { name: 'audio', maxCount: 1 }
+]), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const { name, index, category } = req.body;
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
     // Провери дали предметът съществува
     const existingItem = await db.select().from(gameItems).where(eq(gameItems.id, id)).limit(1);
@@ -98,15 +167,30 @@ router.put('/items/:id', upload.single('image'), async (req, res) => {
     // Подготви данните за обновяване
     const updateData: any = { name, index, category };
 
-    // Ако има нов файл, обнови image path
-    if (req.file) {
-      updateData.image = `/uploads/${req.file.filename}`;
+    // Ако има нови файлове, обнови paths
+    if (files?.image?.[0]) {
+      updateData.image = `/images/${files.image[0].filename}`;
 
       // Изтрий стария файл
       const fs = await import('fs');
-      const oldImagePath = 'client/public' + existingItem[0].image;
-      if (fs.existsSync(oldImagePath)) {
-        fs.unlinkSync(oldImagePath);
+      if (existingItem[0].image) {
+        const oldImagePath = 'client/public' + existingItem[0].image;
+        if (fs.existsSync(oldImagePath)) {
+          fs.unlinkSync(oldImagePath);
+        }
+      }
+    }
+
+    if (files?.audio?.[0]) {
+      updateData.audio = `/audio/${files.audio[0].filename}`;
+
+      // Изтрий стария аудио файл
+      const fs = await import('fs');
+      if (existingItem[0].audio) {
+        const oldAudioPath = 'client/public' + existingItem[0].audio;
+        if (fs.existsSync(oldAudioPath)) {
+          fs.unlinkSync(oldAudioPath);
+        }
       }
     }
 
@@ -121,10 +205,15 @@ router.put('/items/:id', upload.single('image'), async (req, res) => {
   } catch (error) {
     console.error('Error updating item:', error);
 
-    // Изтрий новия файл ако има грешка
-    if (req.file) {
+    // Изтрий новите файлове ако има грешка
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+    if (files?.image?.[0]) {
       const fs = await import('fs');
-      fs.unlinkSync(req.file.path);
+      fs.unlinkSync(files.image[0].path);
+    }
+    if (files?.audio?.[0]) {
+      const fs = await import('fs');
+      fs.unlinkSync(files.audio[0].path);
     }
 
     res.status(500).json({ error: 'Failed to update item' });
@@ -142,11 +231,19 @@ router.delete('/items/:id', async (req, res) => {
       return res.status(404).json({ error: 'Предметът не е намерен' });
     }
 
-    // Изтрий файла от диска
+    // Изтрий файловете от диска
     const fs = await import('fs');
-    const imagePath = 'client/public' + item[0].image;
-    if (fs.existsSync(imagePath)) {
-      fs.unlinkSync(imagePath);
+    if (item[0].image) {
+      const imagePath = 'client/public' + item[0].image;
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+      }
+    }
+    if (item[0].audio) {
+      const audioPath = 'client/public' + item[0].audio;
+      if (fs.existsSync(audioPath)) {
+        fs.unlinkSync(audioPath);
+      }
     }
 
     // Изтрий от базата

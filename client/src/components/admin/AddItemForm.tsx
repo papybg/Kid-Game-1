@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { useCreateItem, useAdminCategories, type CreateItemData } from "../../hooks/use-admin-api";
+import { useCreateItem, useUpdateItem, useAdminCategories, useCreateCategoryIndex, type CreateItemData, type AdminItem } from "../../hooks/use-admin-api";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -10,20 +10,28 @@ import { X, Upload, Plus, Volume2 } from "lucide-react";
 
 interface AddItemFormProps {
   onClose: () => void;
+  editItem?: AdminItem;
 }
 
-export default function AddItemForm({ onClose }: AddItemFormProps) {
+export default function AddItemForm({ onClose, editItem }: AddItemFormProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [availableIndexes, setAvailableIndexes] = useState<string[]>([]);
+  const [availableIndexes, setAvailableIndexes] = useState<{ indexValue: string; description: string }[]>([]);
+  
+  // States за новия индекс
+  const [isAddingNewIndex, setIsAddingNewIndex] = useState(false);
+  const [newIndexValue, setNewIndexValue] = useState("");
+  const [newIndexDescription, setNewIndexDescription] = useState("");
   
   // States за звуковия файл
   const [selectedAudioFile, setSelectedAudioFile] = useState<File | null>(null);
   const [audioFileName, setAudioFileName] = useState<string | null>(null);
   
   const createItemMutation = useCreateItem();
+  const updateItemMutation = useUpdateItem();
   const { data: categories, isLoading: categoriesLoading } = useAdminCategories();
+  const createCategoryIndexMutation = useCreateCategoryIndex();
   
   const {
     register,
@@ -34,8 +42,51 @@ export default function AddItemForm({ onClose }: AddItemFormProps) {
     reset
   } = useForm<CreateItemData>();
 
+  // Initialize form with edit item data
+  useEffect(() => {
+    if (editItem) {
+      setValue("name", editItem.name);
+      setValue("category", editItem.category);
+      setValue("index", editItem.index);
+      setSelectedCategory(editItem.category);
+      
+      // Set preview for existing image
+      if (editItem.image) {
+        setPreviewUrl(editItem.image);
+      }
+      
+      // Set audio filename if exists
+      if (editItem.audio) {
+        setAudioFileName(editItem.audio.split('/').pop() || null);
+      }
+      
+      // Update available indexes for the category
+      if (categories) {
+        const categoryIndexes = categories
+          .filter(cat => cat.categoryName === editItem.category)
+          .map(cat => ({ indexValue: cat.indexValue, description: cat.description || '' }));
+        setAvailableIndexes(categoryIndexes);
+      }
+    }
+  }, [editItem, categories, setValue]);
+
   const watchedCategory = watch("category");
-  const watchedIndex = watch("index");
+
+  const handleCategoryChange = (category: string) => {
+    setValue("category", category);
+    setSelectedCategory(category);
+    
+    // Update available indexes for this category
+    if (categories) {
+      const categoryIndexes = categories
+        .filter(cat => cat.categoryName === category)
+        .map(cat => ({ indexValue: cat.indexValue, description: cat.description || '' }));
+      setAvailableIndexes(categoryIndexes);
+    }
+    
+    // Reset index when category changes
+    setValue("index", "");
+  };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -61,33 +112,45 @@ export default function AddItemForm({ onClose }: AddItemFormProps) {
     }
   };
 
-  const handleCategoryChange = (category: string) => {
-    setValue("category", category);
-    setSelectedCategory(category);
-    
-    // Update available indexes for this category
-    if (categories) {
-      const categoryIndexes = categories
-        .filter(cat => cat.categoryName === category)
-        .map(cat => cat.indexValue);
-      setAvailableIndexes([...new Set(categoryIndexes)]); // Remove duplicates
-    }
-    
-    // Reset index when category changes
-    setValue("index", "");
-  };
+  const handleAddNewIndex = async () => {
+    if (!watchedCategory || !newIndexValue.trim()) return;
 
-  const handleIndexChange = (index: string) => {
-    setValue("index", index);
+    try {
+      await createCategoryIndexMutation.mutateAsync({
+        categoryName: watchedCategory,
+        indexValue: newIndexValue.trim(),
+        description: newIndexDescription.trim() || undefined,
+      });
+
+      // Close the form
+      setIsAddingNewIndex(false);
+      setNewIndexValue("");
+      setNewIndexDescription("");
+    } catch (error) {
+      console.error("Error adding new index:", error);
+    }
   };
 
   const onSubmit = async (data: CreateItemData) => {
     try {
-      await createItemMutation.mutateAsync({
-        ...data,
-        image: selectedFile || undefined,
-        audio: selectedAudioFile || undefined // Добавяме звука
-      });
+      if (editItem) {
+        // Update existing item
+        await updateItemMutation.mutateAsync({
+          id: editItem.id,
+          data: {
+            ...data,
+            image: selectedFile || undefined,
+            audio: selectedAudioFile || undefined
+          }
+        });
+      } else {
+        // Create new item
+        await createItemMutation.mutateAsync({
+          ...data,
+          image: selectedFile || undefined,
+          audio: selectedAudioFile || undefined
+        });
+      }
       
       // Reset form and close
       reset();
@@ -97,7 +160,7 @@ export default function AddItemForm({ onClose }: AddItemFormProps) {
       setAudioFileName(null);
       onClose();
     } catch (error) {
-      console.error("Error creating item:", error);
+      console.error("Error saving item:", error);
     }
   };
 
@@ -105,7 +168,7 @@ export default function AddItemForm({ onClose }: AddItemFormProps) {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Добави нов обект</CardTitle>
+          <CardTitle>{editItem ? "Редактирай обект" : "Добави нов обект"}</CardTitle>
           <Button
             variant="ghost"
             size="icon"
@@ -150,12 +213,7 @@ export default function AddItemForm({ onClose }: AddItemFormProps) {
                   <SelectContent>
                     {categories && [...new Set(categories.map(cat => cat.categoryName))].map((categoryName) => (
                       <SelectItem key={categoryName} value={categoryName}>
-                        <div className="flex items-center gap-2">
-                          <span className="capitalize">{categoryName}</span>
-                          <span className="text-xs text-gray-500">
-                            ({categories.filter(cat => cat.categoryName === categoryName).length} индекса)
-                          </span>
-                        </div>
+                        <span className="capitalize">{categoryName}</span>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -166,31 +224,94 @@ export default function AddItemForm({ onClose }: AddItemFormProps) {
               )}
             </div>
 
-            {/* Index Field - Manual Input */}
+            {/* Index Field - Select from existing or add new */}
             <div className="space-y-2">
-              <Label htmlFor="index">Индекс * (до 2 символа)</Label>
-              <Input
-                id="index"
-                {...register("index", { 
-                  required: "Индексът е задължителен",
-                  maxLength: { value: 2, message: "Индексът трябва да е до 2 символа" },
-                  pattern: { 
-                    value: /^[a-zA-Z0-9]{1,2}$/, 
-                    message: "Индексът може да съдържа само букви и цифри" 
-                  }
-                })}
-                placeholder="напр. h, i, ab"
-                maxLength={2}
-                className="uppercase"
-                style={{ textTransform: 'lowercase' }}
-              />
-              {errors.index && (
-                <p className="text-sm text-red-600">{errors.index.message}</p>
+              <Label htmlFor="index">Индекс *</Label>
+              <div className="flex gap-2">
+                <Select onValueChange={(value) => setValue("index", value)}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Избери индекс" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableIndexes.map((idx) => (
+                      <SelectItem key={idx.indexValue} value={idx.indexValue}>
+                        {idx.indexValue} {idx.description && `(${idx.description})`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setIsAddingNewIndex(true)}
+                  title={watchedCategory ? "Добави нов индекс" : "Първо изберете категория"}
+                  disabled={!watchedCategory}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              {!watch("index") && !isAddingNewIndex && (
+                <p className="text-sm text-red-600">Индексът е задължителен</p>
               )}
-              <p className="text-xs text-gray-500">
-                Въведи индекс от 1-2 символа (букви или цифри)
-              </p>
             </div>
+
+            {/* Add New Index Fields */}
+            {isAddingNewIndex && (
+              <div className="space-y-2 p-4 border rounded-lg bg-gray-50">
+                <h4 className="font-medium">Добави нов индекс за категория "{watchedCategory}"</h4>
+                {!watchedCategory && (
+                  <div className="text-sm text-amber-600 bg-amber-50 p-2 rounded">
+                    ⚠️ Първо трябва да изберете категория за да можете да добавите индекс
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label htmlFor="new-index">Индекс *</Label>
+                    <Input
+                      id="new-index"
+                      value={newIndexValue}
+                      onChange={(e) => setNewIndexValue(e.target.value.toLowerCase())}
+                      placeholder="напр. z"
+                      maxLength={2}
+                      disabled={!watchedCategory}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="new-description">Описание</Label>
+                    <Input
+                      id="new-description"
+                      value={newIndexDescription}
+                      onChange={(e) => setNewIndexDescription(e.target.value)}
+                      placeholder="Описание на индекса"
+                      disabled={!watchedCategory}
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleAddNewIndex}
+                    disabled={!newIndexValue.trim() || createCategoryIndexMutation.isPending || !watchedCategory}
+                  >
+                    {createCategoryIndexMutation.isPending ? "Добавяне..." : "Добави индекс"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setIsAddingNewIndex(false);
+                      setNewIndexValue("");
+                      setNewIndexDescription("");
+                    }}
+                  >
+                    Отказ
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Image Upload */}
             <div className="space-y-2">
@@ -305,18 +426,18 @@ export default function AddItemForm({ onClose }: AddItemFormProps) {
               </Button>
               <Button
                 type="submit"
-                disabled={createItemMutation.isPending || !watchedCategory}
+                disabled={(createItemMutation.isPending || updateItemMutation.isPending) || !watchedCategory}
                 className="flex-1"
               >
-                {createItemMutation.isPending ? (
+                {(createItemMutation.isPending || updateItemMutation.isPending) ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Добавяне...
+                    {editItem ? "Запазване..." : "Добавяне..."}
                   </>
                 ) : (
                   <>
                     <Plus className="w-4 h-4 mr-2" />
-                    Добави
+                    {editItem ? "Запази" : "Добави"}
                   </>
                 )}
               </Button>

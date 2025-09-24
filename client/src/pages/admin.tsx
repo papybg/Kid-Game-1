@@ -2,13 +2,17 @@ import { useState, useEffect } from "react";
 import { useAdminItems, useDeleteItem } from "../hooks/use-admin-api";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Trash2, Edit, Plus, ArrowLeft } from "lucide-react";
 import AddItemForm from "../components/admin/AddItemForm";
+import type { AdminItem } from "../hooks/use-admin-api";
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editItem, setEditItem] = useState<AdminItem | null>(null);
 
   // API hooks
   const { data: items, isLoading: itemsLoading, error } = useAdminItems();
@@ -32,6 +36,16 @@ export default function AdminPage() {
         alert("Грешка при изтриване на обекта!");
       }
     }
+  };
+
+  const handleEditItem = (item: AdminItem) => {
+    setEditItem(item);
+    setShowAddForm(true);
+  };
+
+  const handleCloseForm = () => {
+    setShowAddForm(false);
+    setEditItem(null);
   };
 
   if (isLoading) {
@@ -81,109 +95,149 @@ export default function AdminPage() {
           </Button>
         </div>
 
-        {/* Add Item Button */}
-        <div className="mb-6">
-          <Button 
-            className="flex items-center gap-2"
-            onClick={() => setShowAddForm(true)}
-          >
-            <Plus className="w-4 h-4" />
-            Добави нов обект
-          </Button>
-        </div>
+        {/* Admin Tabs */}
+        <Tabs defaultValue="items" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="items">Обекти</TabsTrigger>
+            <TabsTrigger value="portals">Портали</TabsTrigger>
+          </TabsList>
 
-        {/* Items List */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Всички обекти в играта</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {itemsLoading ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-                <p className="mt-2 text-gray-600">Зареждане на обектите...</p>
-              </div>
-            ) : error ? (
-              <div className="text-center py-8 text-red-600">
-                <p>Грешка при зареждане на обектите!</p>
-                <p className="text-sm text-gray-500 mt-1">{error.message}</p>
-              </div>
-            ) : !items?.length ? (
-              <div className="text-center py-8 text-gray-500">
-                <p>Все още няма добавени обекти.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="border rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow"
-                  >
-                    {/* Item Image */}
-                    <div className="aspect-square bg-gray-100 rounded-lg mb-3 overflow-hidden">
-                      {item.image ? (
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400">
-                          <div className="text-center">
-                            <div className="text-2xl mb-1">📷</div>
-                            <div className="text-xs">Няма снимка</div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+          {/* Items Tab */}
+          <TabsContent value="items" className="space-y-6">
+            {/* Add Item Button */}
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-semibold text-gray-700">Управление на обекти</h2>
+              <Button 
+                className="flex items-center gap-2"
+                onClick={() => setShowAddForm(true)}
+              >
+                <Plus className="w-4 h-4" />
+                Добави нов обект
+              </Button>
+            </div>
 
-                    {/* Item Info */}
-                    <div className="space-y-1 mb-3">
-                      <h3 className="font-semibold text-gray-800 truncate">
-                        {item.name}
-                      </h3>
-                      <p className="text-sm text-gray-600">
-                        Индекс: <span className="font-mono bg-gray-100 px-1 rounded">{item.index}</span>
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Категория: <span className="text-blue-600">{item.category}</span>
-                      </p>
-                      <p className="text-xs text-gray-400">
-                        ID: {item.id}
-                      </p>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 text-blue-600 hover:text-blue-700"
-                        title="Редактирай"
-                      >
-                        <Edit className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 text-red-600 hover:text-red-700"
-                        title="Изтрий"
-                        onClick={() => handleDeleteItem(item.id, item.name)}
-                        disabled={deleteItemMutation.isPending}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
+            {/* Items List */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Всички обекти в играта</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {itemsLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+                    <p className="mt-2 text-gray-600">Зареждане на обектите...</p>
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                ) : error ? (
+                  <div className="text-center py-8 text-red-600">
+                    <p>Грешка при зареждане на обектите!</p>
+                    <p className="text-sm text-gray-500 mt-1">{error.message}</p>
+                  </div>
+                ) : !items?.length ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>Все още няма добавени обекти.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-16">Снимка</TableHead>
+                          <TableHead>Име</TableHead>
+                          <TableHead className="w-20">Индекс</TableHead>
+                          <TableHead className="w-24">Категория</TableHead>
+                          <TableHead className="w-16">ID</TableHead>
+                          <TableHead className="w-32">Действия</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {items.map((item) => (
+                          <TableRow key={item.id}>
+                            <TableCell>
+                              <div className="w-12 h-12 bg-gray-100 rounded overflow-hidden flex items-center justify-center">
+                                {item.image ? (
+                                  <img
+                                    src={item.image}
+                                    alt={item.name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="text-gray-400 text-xs">📷</div>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="font-medium">{item.name}</TableCell>
+                            <TableCell>
+                              <span className="font-mono bg-gray-100 px-2 py-1 rounded text-sm">
+                                {item.index}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-blue-600">{item.category}</TableCell>
+                            <TableCell className="text-sm text-gray-500">{item.id}</TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 px-2 text-blue-600 hover:text-blue-700"
+                                  title="Редактирай"
+                                  onClick={() => handleEditItem(item)}
+                                >
+                                  <Edit className="w-3 h-3" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 px-2 text-red-600 hover:text-red-700"
+                                  title="Изтрий"
+                                  onClick={() => handleDeleteItem(item.id, item.name)}
+                                  disabled={deleteItemMutation.isPending}
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Portals Tab */}
+          <TabsContent value="portals" className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-semibold text-gray-700">Управление на портали</h2>
+              <Button 
+                className="flex items-center gap-2"
+                disabled
+              >
+                <Plus className="w-4 h-4" />
+                Добави нов портал (скоро)
+              </Button>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Всички портали в играта</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8 text-gray-500">
+                  <p>Функционалността за управление на портали ще бъде добавена скоро.</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         {/* Add Item Form Modal */}
         {showAddForm && (
-          <AddItemForm onClose={() => setShowAddForm(false)} />
+          <AddItemForm 
+            onClose={handleCloseForm} 
+            editItem={editItem || undefined} 
+          />
         )}
       </div>
     </div>

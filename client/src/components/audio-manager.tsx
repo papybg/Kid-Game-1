@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useAudio } from "../hooks/use-audio";
 import { useSettingsStore } from "../lib/settings-store";
+import type { GameItem } from "@shared/schema";
 
 type AudioContextType = {
   isInitialized: boolean;
@@ -13,7 +14,7 @@ type AudioContextType = {
   setEffectsEnabled: (enabled: boolean) => void;
   playSound: (type: 'success' | 'error' | 'click' | 'start' | 'win' | 'bell') => void;
   playVoice: (type: 'bravo' | 'tryAgain') => void;
-  playAnimalSound: (itemNameOrIndex: string, delay?: number) => HTMLAudioElement | null; // Променяме да връща аудиото
+  playAnimalSound: (item: GameItem, delay?: number) => HTMLAudioElement | null; // Променяме да приема item
   getSoundFile: (name: 'win' | 'bravo' | 'tryAgain') => HTMLAudioElement | null; // НОВАТА ФУНКЦИЯ
   initializeAudio: () => Promise<void>;
 };
@@ -129,12 +130,15 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     voiceSound?.play().catch(e => console.error(`Failed to play voice ${type}:`, e));
   };
 
-  const playAnimalSound = (itemNameOrIndex: string, delay?: number) => {
+  const playAnimalSound = (item: GameItem, delay?: number) => {
     if (!isInitialized || !soundEnabled) return null;
     
     let audio: HTMLAudioElement | null = null;
     const playAfterDelay = () => {
-      const audioUrl = ITEM_AUDIO_MAP[itemNameOrIndex] || AUDIO_FILES.animals[itemNameOrIndex as keyof typeof AUDIO_FILES.animals];
+      let audioUrl = item.audio; // Use item's audio first
+      if (!audioUrl) {
+        audioUrl = ITEM_AUDIO_MAP[item.name] || AUDIO_FILES.animals[item.index as keyof typeof AUDIO_FILES.animals];
+      }
       if (audioUrl) {
         const sound = new Audio(audioUrl);
         sound.volume = 0.7;
@@ -162,10 +166,11 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
 
     if (delay && delay > 0) {
       setTimeout(playAfterDelay, delay);
+      return null; // За delayed звуци не можем да върнем audio обект
     } else {
       playAfterDelay();
+      return audio; // Връщаме създадения audio обект
     }
-    return audio; // Връщаме аудио обекта
   };
 
 
