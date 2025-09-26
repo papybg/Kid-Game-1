@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useAdminItems, useDeleteItem } from "../hooks/use-admin-api";
+import { useAdminItems, useDeleteItem, useAdminPortals } from "../hooks/use-admin-api";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
@@ -21,6 +21,7 @@ export default function AdminPage() {
 
   // API hooks
   const { data: items, isLoading: itemsLoading, error } = useAdminItems();
+  const { data: portals, isLoading: portalsLoading, error: portalsError } = useAdminPortals();
   const deleteItemMutation = useDeleteItem();
 
   useEffect(() => {
@@ -50,6 +51,11 @@ export default function AdminPage() {
 
   const handleEditPortal = (portalId: string) => {
     setEditPortalId(portalId);
+    setShowPortalEditor(true);
+  };
+
+  const handleCreateNewPortal = () => {
+    setEditPortalId(undefined); // Няма ID за нови портали
     setShowPortalEditor(true);
   };
 
@@ -222,7 +228,7 @@ export default function AdminPage() {
               <h2 className="text-2xl font-semibold text-gray-700">Управление на портали</h2>
               <Button 
                 className="flex items-center gap-2"
-                onClick={() => setShowPortalEditor(true)}
+                onClick={handleCreateNewPortal}
               >
                 <Plus className="w-4 h-4" />
                 Добави нов портал
@@ -234,51 +240,73 @@ export default function AdminPage() {
                 <CardTitle>Всички портали в играта</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>ID</TableHead>
-                        <TableHead>Име</TableHead>
-                        <TableHead>Desktop Слотове</TableHead>
-                        <TableHead>Mobile Слотове</TableHead>
-                        <TableHead>Статус</TableHead>
-                        <TableHead className="w-32">Действия</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      <TableRow>
-                        <TableCell className="font-medium">d1</TableCell>
-                        <TableCell>Зелена долина - Ниво 1</TableCell>
-                        <TableCell>8 слота</TableCell>
-                        <TableCell>0 слота</TableCell>
-                        <TableCell>
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            Активен
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => handleEditPortal('d1')}
-                            >
-                              <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              disabled
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-                </div>
+                {portalsLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+                    <p className="mt-2 text-gray-600">Зареждане на порталите...</p>
+                  </div>
+                ) : portalsError ? (
+                  <div className="text-center py-8 text-red-600">
+                    <p>Грешка при зареждане на порталите!</p>
+                    <p className="text-sm text-gray-500 mt-1">{portalsError.message}</p>
+                  </div>
+                ) : !portals?.length ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>Все още няма създадени портали.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>ID</TableHead>
+                          <TableHead>Име</TableHead>
+                          <TableHead>Desktop Слотове</TableHead>
+                          <TableHead>Mobile Слотове</TableHead>
+                          <TableHead>Статус</TableHead>
+                          <TableHead className="w-32">Действия</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {portals.map((portal) => (
+                          <TableRow key={portal.id}>
+                            <TableCell className="font-medium">{portal.id}</TableCell>
+                            <TableCell>{portal.portalName}</TableCell>
+                            <TableCell>{portal.cellCount} слота</TableCell>
+                            <TableCell>{portal.cellCount} слота</TableCell>
+                            <TableCell>
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                portal.isLocked 
+                                  ? 'bg-red-100 text-red-800' 
+                                  : 'bg-green-100 text-green-800'
+                              }`}>
+                                {portal.isLocked ? 'Заключен' : 'Активен'}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => handleEditPortal(portal.id)}
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  disabled
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

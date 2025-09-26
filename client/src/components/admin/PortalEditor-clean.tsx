@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { X, Save, Trash2 } from 'lucide-react';
+import { X, Save, Trash2, Upload } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface Slot {
   id: string;
@@ -22,6 +23,7 @@ interface PortalEditorProps {
 }
 
 export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
+  const queryClient = useQueryClient();
   // Portal Settings State
   const [portalName, setPortalName] = useState('');
   const [slotMode, setSlotMode] = useState<'with_cells' | 'without_cells'>('with_cells');
@@ -35,6 +37,13 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
   const [selectedIcon, setSelectedIcon] = useState<string | null>(null);
   const [availableIcons, setAvailableIcons] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Generated background files state
+  const [generatedFiles, setGeneratedFiles] = useState<{
+    desktop?: string;
+    mobile?: string;
+    icon?: string;
+  }>({});
 
   // Desktop Canvas State (single source for both desktop and mobile)
   const [desktopSlots, setDesktopSlots] = useState<Slot[]>([]);
@@ -56,7 +65,7 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
   }));
   
   // Computed background image path
-  const backgroundImage = `/images/backgrounds/${backgroundFileName}`;
+  const backgroundImage = backgroundFileName ? `/images/backgrounds/${backgroundFileName}` : '';
   
   // Available background files
   const availableBackgrounds = [
@@ -64,8 +73,8 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
     { value: 'dolina-small.png', label: 'Долина (Малка)', size: { width: 1280, height: 720 } }
   ];
 
-  // Available indices for dropdown
-  const availableIndices = [
+  // Available indices for dropdown - loaded from database
+  const [availableIndices, setAvailableIndices] = useState([
     { value: 'h', label: 'h - домашни' },
     { value: 'p', label: 'p - селскостопански' },
     { value: 'i', label: 'i - транспорт (влак)' },
@@ -76,8 +85,12 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
     { value: 'o', label: 'o - океан' },
     { value: 'd', label: 'd - други' },
     { value: 'f', label: 'f - други' },
-    { value: 'z', label: 'z - неясна категория' }
-  ];
+    { value: 'z', label: 'z - неясна категория' },
+    { value: 'sa', label: 'sa - транспорт (автобус/самолет/балон)' },
+    { value: 'sg', label: 'sg - транспорт (самолет)' },
+    { value: 'rg', label: 'rg - транспорт (garbage)' },
+    { value: 'rp', label: 'rp - транспорт (пожарна)' }
+  ]);
 
   // Load existing data when editing
   useEffect(() => {
@@ -215,47 +228,118 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
     : null;
 
   const handleSave = async () => {
-    if (!portalId) {
-      alert('Няма избран портал за записване');
+    if (!portalName.trim()) {
+      alert('Моля въведете име на портала');
+      return;
+    }
+
+    if (!backgroundFileName) {
+      alert('Моля изберете фонова картина преди да запазите портала');
       return;
     }
 
     setIsSaving(true);
-    
+
     try {
-      // Prepare data for save
-      const saveData = {
-        name: portalName,
-        backgroundLarge: backgroundImage,
-        backgroundSmall: backgroundImage.replace('large', 'small'), 
+      let layoutId: string;
+      let portalIdToUse: string;
+
+      if (portalId) {
+        // Editing existing portal
+        portalIdToUse = portalId;
+        layoutId = portalId;
+      } else {
+        // Creating new portal - generate IDs
+        // Get existing portals to find next available ID
+        const portalsResponse = await fetch('http://localhost:3005/api/portals');
+        let existingPortals: string[] = ['d1']; // Default
+
+        if (portalsResponse.ok) {
+          const portalsData = await portalsResponse.json();
+          existingPortals = portalsData.map((p: any) => p.id);
+        }
+
+        // Generate next available portal ID
+        let nextId = 2;
+        while (existingPortals.includes(`d${nextId}`)) {
+          nextId++;
+        }
+
+        portalIdToUse = `d${nextId}`;
+        layoutId = `l${Date.now()}`; // Use timestamp for layout ID
+
+        // Create new portal first
+        const portalData = {
+          id: portalIdToUse,
+          portalName: portalName.trim(),
+          fileName: backgroundFileName,
+          iconFileName: selectedIcon || backgroundFileName,
+          layouts: [layoutId],
+          cellCount: desktopSlots.length,
+          min_cells: Math.max(1, desktopSlots.length - 2),
+          max_cells: desktopSlots.length + 2,
+          item_count_rule: "equals_cells",
+          isLocked: false
+        };
+
+        console.log('Creating new portal:', portalData);
+
+        const portalResponse = await fetch('http://localhost:3005/api/portals', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(portalData)
+        });
+
+        if (!portalResponse.ok) {
+          const errorData = await portalResponse.json().catch(() => ({ message: 'Unknown error' }));
+          throw new Error(`Failed to create portal: ${errorData.message || portalResponse.status}`);
+        }
+
+        console.log('Portal created successfully');
+      }
+
+      // Prepare layout data for save/create
+      const layoutData = {
+        id: layoutId,
+        name: portalName.trim(),
+        backgroundLarge: generatedFiles.desktop ? `/images/backgrounds/${generatedFiles.desktop}` : `/images/backgrounds/${backgroundFileName}`,
+        backgroundSmall: generatedFiles.mobile ? `/images/backgrounds/${generatedFiles.mobile}` : `/images/backgrounds/${backgroundFileName}`,
         slots_desktop: desktopSlots,
         slots_mobile: mobileSlots,
         ...(selectedIcon && { iconFileName: selectedIcon })
       };
 
-      console.log('Saving portal data:', saveData);
+      console.log('Saving layout data:', layoutData);
 
-      // Save to backend
-      const response = await fetch(`http://localhost:3005/api/layouts/${portalId}`, {
+      // Save layout (create if new, update if existing)
+      const layoutResponse = await fetch(`http://localhost:3005/api/layouts/${layoutId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(saveData)
+        body: JSON.stringify(layoutData)
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (!layoutResponse.ok) {
+        const errorData = await layoutResponse.json().catch(() => ({ message: 'Unknown error' }));
+        throw new Error(`Failed to save layout: ${errorData.message || layoutResponse.status}`);
       }
 
-      const result = await response.json();
+      const result = await layoutResponse.json();
       console.log('Save successful:', result);
+
+      alert(`Портала е ${portalId ? 'запазен' : 'създаден'} успешно! ID: ${portalIdToUse}`);
       
-      alert('Портала е запазен успешно!');
+      // Refresh portals list in admin panel
+      queryClient.invalidateQueries({ queryKey: ["admin-portals"] });
+      
       onClose();
     } catch (error) {
       console.error('Failed to save portal:', error);
-      alert('Грешка при запазване на портала. Моля опитайте отново.');
+      const errorMessage = error instanceof Error ? error.message : 'Неизвестна грешка';
+      alert(`Грешка при запазване на портала: ${errorMessage}`);
     } finally {
       setIsSaving(false);
     }
@@ -267,15 +351,14 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
       if (!portalId || !isOpen) return;
       
       try {
-        // Fetch layout data from API (contains slots)
+        console.log(`Attempting to load data for portal: ${portalId}`);
         const response = await fetch(`http://localhost:3005/api/layouts/${portalId}`);
+        
         if (response.ok) {
           const layoutData = await response.json();
           
           // Load portal settings
           setPortalName(layoutData.name || '');
-          // setSlotMode - not in API data yet
-          // setBackgroundFileName - extract from backgroundLarge path
           if (layoutData.backgroundLarge) {
             const fileName = layoutData.backgroundLarge.split('/').pop() || 'dolina-large.png';
             setBackgroundFileName(fileName);
@@ -286,8 +369,12 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
             setDesktopSlots(layoutData.slots_desktop);
           }
           
-          console.log('Loaded layout data:', layoutData);
-          console.log('Desktop slots loaded:', layoutData.slots_desktop);
+          console.log('Successfully loaded layout data:', layoutData);
+        } else if (response.status === 404) {
+          // Portal doesn't exist - this is normal for new portals
+          console.log(`Portal ${portalId} not found - this is expected for new portals`);
+        } else {
+          console.error(`Failed to load portal ${portalId}: ${response.status}`);
         }
       } catch (error) {
         console.error('Failed to load portal data:', error);
@@ -296,6 +383,25 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
 
     loadPortalData();
   }, [portalId, isOpen]);
+
+  // Reset state when opening for new portal
+  useEffect(() => {
+    if (isOpen) {
+      // Reset all state when opening the editor
+      setPortalName('');
+      setSlotMode('with_cells');
+      setBackgroundFileName('');
+      setImageSize({ width: 1920, height: 1080 });
+      setActiveTab('desktop');
+      setSelectedIcon(null);
+      setIsSaving(false);
+      setGeneratedFiles({});
+      setDesktopSlots([]);
+      setSelectedSlot(null);
+      setIsDragging(false);
+      setDragOffset({ x: 0, y: 0 });
+    }
+  }, [isOpen]);
 
   // Load available icons
   useEffect(() => {
@@ -328,8 +434,29 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
       }
     };
 
+    // Load categories/indices from database
+    const loadCategories = async () => {
+      try {
+        const response = await fetch('http://localhost:3005/api/admin/categories');
+        if (response.ok) {
+          const categories = await response.json();
+          const indices = categories.map((cat: any) => ({
+            value: cat.indexValue,
+            label: `${cat.indexValue} - ${cat.categoryName}${cat.description ? ` (${cat.description})` : ''}`
+          }));
+          setAvailableIndices(indices);
+          console.log('Loaded categories from database:', indices);
+        } else {
+          console.log('Failed to load categories, using fallback');
+        }
+      } catch (error) {
+        console.error('Failed to load categories:', error);
+      }
+    };
+
     if (isOpen) {
       loadIcons();
+      loadCategories();
     }
   }, [isOpen]);
 
@@ -358,6 +485,67 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
     alert(`Upload на "${file.name}" ще бъде имплементиран в следващата фаза.`);
   };
 
+  const handleBackgroundUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      alert('Моля изберете изображение файл (PNG, JPG)');
+      return;
+    }
+
+    // Check file size (max 10MB for backgrounds)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Файлът е твърде голям. Максимален размер: 10MB');
+      return;
+    }
+
+    try {
+      console.log('Uploading background:', file.name);
+
+      // Create FormData for upload
+      const formData = new FormData();
+      formData.append('background', file);
+      formData.append('portalId', portalId || 'd1');
+
+      // Upload to server
+      const response = await fetch('http://localhost:3005/api/upload/background', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Upload successful:', result);
+
+      // Update state with new filenames
+      setBackgroundFileName(result.desktop);
+      setImageSize(result.size || { width: 1920, height: 1080 });
+
+      // Store generated files for display in tabs
+      setGeneratedFiles({
+        desktop: result.desktop,
+        mobile: result.mobile,
+        icon: result.icon
+      });
+
+      alert(`Фонът е качен успешно! Създадени са файлове:\n- Desktop: ${result.desktop}\n- Mobile: ${result.mobile}\n- Icon: ${result.icon}`);
+
+    } catch (error) {
+      console.error('Failed to upload background:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Неизвестна грешка';
+      alert(`Грешка при качване на фона: ${errorMessage}`);
+    } finally {
+      // Clear the input only after processing is complete
+      event.target.value = '';
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-[98vw] max-h-[98vh] h-[98vh] p-0 overflow-hidden">
@@ -368,6 +556,9 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
               <DialogTitle className="text-xl">
                 {portalId ? `Редактиране на портал: ${portalId}` : 'Създаване на нов портал'}
               </DialogTitle>
+              <DialogDescription className="sr-only">
+                {portalId ? `Редактирайте настройките на портал ${portalId}` : 'Създайте нов портал с фонова картина, slots и настройки'}
+              </DialogDescription>
               <div className="flex gap-2">
                 <Button 
                   onClick={handleSave} 
@@ -403,18 +594,31 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
               {/* Background File */}
               <div className="space-y-2">
                 <Label className="text-sm">Фонова картина</Label>
-                <Select value={backgroundFileName} onValueChange={handleBackgroundChange}>
-                  <SelectTrigger className="h-8">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableBackgrounds.map(bg => (
-                      <SelectItem key={bg.value} value={bg.value}>
-                        {bg.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="flex gap-2">
+                  <Input
+                    value={backgroundFileName}
+                    readOnly
+                    placeholder="Няма избран файл - моля качете нов"
+                    className="h-8 flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => document.getElementById('background-upload')?.click()}
+                    className="h-8 px-3"
+                  >
+                    <Upload className="w-4 h-4 mr-1" />
+                    Upload
+                  </Button>
+                </div>
+                <input
+                  id="background-upload"
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg"
+                  onChange={handleBackgroundUpload}
+                  className="hidden"
+                />
               </div>
 
               {/* Image Size Display */}
@@ -467,9 +671,9 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
                       className="relative w-full bg-gray-100 border-2 border-gray-300 rounded-lg overflow-hidden cursor-crosshair flex-1"
                       style={{ 
                         minHeight: '400px',
-                        backgroundImage: `url('${backgroundImage}')`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center'
+                        backgroundImage: backgroundImage ? `url('${backgroundImage}')` : 'linear-gradient(45deg, #f3f4f6 25%, transparent 25%), linear-gradient(-45deg, #f3f4f6 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f3f4f6 75%), linear-gradient(-45deg, transparent 75%, #f3f4f6 75%)',
+                        backgroundSize: backgroundImage ? 'cover' : '20px 20px',
+                        backgroundPosition: backgroundImage ? 'center' : '0 0, 0 10px, 10px -10px, -10px 0px'
                       }}
                       onClick={handleCanvasClick}
                     >
@@ -501,6 +705,16 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
                       <div className="absolute bottom-4 left-4 bg-black/70 text-white px-3 py-1 rounded text-sm">
                         Desktop Slots: {desktopSlots.length}
                       </div>
+                      
+                      {/* No background message */}
+                      {!backgroundFileName && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                          <div className="bg-white/90 px-4 py-2 rounded-lg text-center">
+                            <p className="text-sm font-medium text-gray-700">Няма избрана фонова картина</p>
+                            <p className="text-xs text-gray-500 mt-1">Качете файл в секцията "Настройки на портал"</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -616,9 +830,9 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
                       className="relative w-full bg-gray-100 border-2 border-gray-300 rounded-lg overflow-hidden cursor-crosshair flex-1"
                       style={{ 
                         minHeight: '400px',
-                        backgroundImage: `url('${backgroundImage}')`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center'
+                        backgroundImage: backgroundImage ? `url('${backgroundImage}')` : 'linear-gradient(45deg, #f3f4f6 25%, transparent 25%), linear-gradient(-45deg, #f3f4f6 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f3f4f6 75%), linear-gradient(-45deg, transparent 75%, #f3f4f6 75%)',
+                        backgroundSize: backgroundImage ? 'cover' : '20px 20px',
+                        backgroundPosition: backgroundImage ? 'center' : '0 0, 0 10px, 10px -10px, -10px 0px'
                       }}
                       onClick={handleCanvasClick}
                     >
@@ -650,11 +864,43 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
                       <div className="absolute bottom-4 left-4 bg-black/70 text-white px-3 py-1 rounded text-sm">
                         Mobile Slots: {mobileSlots.length}
                       </div>
+                      
+                      {/* No background message */}
+                      {!backgroundFileName && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                          <div className="bg-white/90 px-4 py-2 rounded-lg text-center">
+                            <p className="text-sm font-medium text-gray-700">Няма избрана фонова картина</p>
+                            <p className="text-xs text-gray-500 mt-1">Качете файл в секцията "Настройки на портал"</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   {/* Properties Panel - Right Half (shared with Desktop) */}
                   <div className="flex flex-col">
+                    {/* Generated Mobile File Preview */}
+                    {generatedFiles.mobile && (
+                      <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <h4 className="text-sm font-semibold text-green-800 mb-2">Генериран мобилен файл</h4>
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={`/images/backgrounds/${generatedFiles.mobile}`}
+                            alt="Mobile background"
+                            className="w-16 h-16 object-cover rounded border"
+                          />
+                          <div className="flex-1">
+                            <p className="text-xs font-mono text-green-700 break-all">
+                              {generatedFiles.mobile}
+                            </p>
+                            <p className="text-xs text-green-600 mt-1">
+                              70% от оригиналния размер
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="bg-gray-50 p-4 rounded-lg flex-1 overflow-y-auto">
                       <h3 className="font-semibold mb-4 text-lg">Properties</h3>
                       
@@ -752,6 +998,28 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
               {/* Icon Tab */}
               <TabsContent value="icon" className="flex-1 overflow-hidden">
                 <div className="h-full p-4">
+                  {/* Generated Icon File Preview */}
+                  {generatedFiles.icon && (
+                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <h4 className="text-sm font-semibold text-blue-800 mb-2">Генерирана икона</h4>
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={`/images/backgrounds/${generatedFiles.icon}`}
+                          alt="Generated icon"
+                          className="w-16 h-16 object-cover rounded border"
+                        />
+                        <div className="flex-1">
+                          <p className="text-xs font-mono text-blue-700 break-all">
+                            {generatedFiles.icon}
+                          </p>
+                          <p className="text-xs text-blue-600 mt-1">
+                            200x200 пиксела
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="mb-4">
                     <h3 className="text-lg font-semibold mb-2">Icon Gallery</h3>
                     <p className="text-sm text-gray-600 mb-4">

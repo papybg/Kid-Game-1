@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
-// Types за admin API
 export interface AdminItem {
   id: number;
   name: string;
@@ -8,6 +7,19 @@ export interface AdminItem {
   audio?: string; // Добавяме звук към AdminItem
   index: string;
   category: string;
+}
+
+export interface Portal {
+  id: string;
+  portalName: string;
+  fileName: string;
+  iconFileName: string;
+  layouts: string[];
+  cellCount: number;
+  min_cells: number;
+  max_cells: number;
+  item_count_rule: string;
+  isLocked: boolean;
 }
 
 export interface CategoryIndex {
@@ -50,6 +62,20 @@ export const useAdminCategories = () => {
       const response = await fetch(`${API_BASE}/categories`);
       if (!response.ok) {
         throw new Error("Failed to fetch categories");
+      }
+      return response.json();
+    },
+  });
+};
+
+// GET всички портали
+export const useAdminPortals = () => {
+  return useQuery({
+    queryKey: ["admin-portals"],
+    queryFn: async (): Promise<Portal[]> => {
+      const response = await fetch("http://localhost:3005/api/portals");
+      if (!response.ok) {
+        throw new Error("Failed to fetch portals");
       }
       return response.json();
     },
