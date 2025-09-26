@@ -64,6 +64,20 @@ export class DbStorage {
     return result[0];
   }
 
+  async updateGameLayout(id: string, updates: Partial<InsertGameLayout>): Promise<GameLayout> {
+    const result = await db
+      .update(gameLayouts)
+      .set(updates)
+      .where(eq(gameLayouts.id, id))
+      .returning();
+    
+    if (result.length === 0) {
+      throw new Error(`Layout with id ${id} not found`);
+    }
+    
+    return result[0];
+  }
+
   // User Progress
   async getUserProgress(): Promise<UserProgress[]> {
     return await db.select().from(userProgress);

@@ -28,6 +28,7 @@ export interface IStorage {
   getGameLayouts(): Promise<GameLayout[]>;
   getGameLayout(id: string): Promise<GameLayout | undefined>;
   createGameLayout(layout: InsertGameLayout): Promise<GameLayout>;
+  updateGameLayout(id: string, updates: Partial<InsertGameLayout>): Promise<GameLayout>;
 
   // User Progress
   getUserProgress(): Promise<UserProgress[]>;
@@ -54,10 +55,14 @@ export class MemStorage implements IStorage {
     // Initialize default portal
     const defaultPortal: Portal = {
       id: "dolina",
-      name: "Зелена долина",
-      icon: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&h=200",
+      portalName: "Зелена долина",
+      fileName: "dolina.png",
+      iconFileName: "dolina-icon.png", 
       layouts: ["d1"],
-      difficulty: "easy",
+      cellCount: 6,
+      min_cells: 4,
+      max_cells: 8,
+      item_count_rule: "equals_cells",
       isLocked: false,
       createdAt: new Date(),
     };
@@ -69,6 +74,7 @@ export class MemStorage implements IStorage {
         id: 1,
         name: "Котка",
         image: "/images/cat.png",
+        audio: "/audio/cat.mp3",
         index: "h",
         category: "домашни",
         createdAt: new Date(),
@@ -77,6 +83,7 @@ export class MemStorage implements IStorage {
         id: 2,
         name: "Куче",
         image: "/images/dog.png",
+        audio: "/audio/dog.mp3",
         index: "h",
         category: "домашни",
         createdAt: new Date(),
@@ -85,6 +92,7 @@ export class MemStorage implements IStorage {
         id: 3,
         name: "Кокошка",
         image: "/images/chicken.png",
+        audio: "/audio/chicken.mp3",
         index: "p",
         category: "селскостопански",
         createdAt: new Date(),
@@ -93,6 +101,7 @@ export class MemStorage implements IStorage {
         id: 4,
         name: "Влак",
         image: "/images/train.png",
+        audio: "/audio/train.mp3",
         index: "i",
         category: "транспорт",
         createdAt: new Date(),
@@ -101,6 +110,7 @@ export class MemStorage implements IStorage {
         id: 5,
         name: "Автобус",
         image: "/images/bus.png",
+        audio: "/audio/bus.mp3",
         index: "r",
         category: "транспорт",
         createdAt: new Date(),
@@ -109,6 +119,7 @@ export class MemStorage implements IStorage {
         id: 6,
         name: "Врана",
         image: "/images/crow.png",
+        audio: "/audio/crow.mp3",
         index: "s",
         category: "птици",
         createdAt: new Date(),
@@ -121,6 +132,7 @@ export class MemStorage implements IStorage {
         id: 7,
         name: "Крава",
         image: "/images/cow.png",
+        audio: "/audio/cow.mp3",
         index: "p", 
         category: "селскостопански",
         createdAt: new Date(),
@@ -129,6 +141,7 @@ export class MemStorage implements IStorage {
         id: 8,
         name: "Самолет",
         image: "/images/airplane.png",
+        audio: "/audio/airplane.mp3",
         index: "s",
         category: "транспорт", 
         createdAt: new Date(),
@@ -146,7 +159,7 @@ export class MemStorage implements IStorage {
       name: "Зелена долина - Ниво 1",
       backgroundLarge: "/images/backgrounds/dolina-large.png",
       backgroundSmall: "/images/backgrounds/dolina-small.png",
-      slots: [
+      slots_desktop: [
         { index: ["s"], position: { top: "25%", left: "15%" }, diameter: "11%" },
         { index: ["s"], position: { top: "23%", left: "80%" }, diameter: "11%" },
         { index: ["p", "h"], position: { top: "70%", left: "80%" }, diameter: "11%" },
@@ -154,6 +167,7 @@ export class MemStorage implements IStorage {
         { index: ["r"], position: { top: "65%", left: "65%" }, diameter: "11%" },
         { index: ["p"], position: { top: "72%", left: "92%" }, diameter: "11%" },
       ],
+      slots_mobile: null,
       createdAt: new Date(),
     };
     this.gameLayouts.set(defaultLayout.id, defaultLayout);
@@ -183,10 +197,14 @@ export class MemStorage implements IStorage {
   async createPortal(portal: InsertPortal): Promise<Portal> {
     const newPortal: Portal = {
       id: portal.id,
-      name: portal.name,
-      icon: portal.icon,
+      portalName: portal.portalName,
+      fileName: portal.fileName,
+      iconFileName: portal.iconFileName,
       layouts: Array.isArray(portal.layouts) ? [...portal.layouts] : [],
-      difficulty: portal.difficulty,
+      cellCount: portal.cellCount,
+      min_cells: portal.min_cells,
+      max_cells: portal.max_cells,
+      item_count_rule: portal.item_count_rule,
       isLocked: portal.isLocked ?? null,
       createdAt: new Date(),
     };
@@ -204,8 +222,13 @@ export class MemStorage implements IStorage {
   }
 
   async createGameItem(item: InsertGameItem): Promise<GameItem> {
+    const id = Math.max(...this.gameItems.keys()) + 1; // Generate new ID
     const newItem: GameItem = {
-      ...item,
+      id: id,
+      name: item.name,
+      image: item.image,
+      audio: item.audio,
+      index: item.index,
       category: item.category ?? null, // Convert undefined to null
       createdAt: new Date(),
     };
@@ -228,11 +251,29 @@ export class MemStorage implements IStorage {
       name: layout.name,
       backgroundLarge: layout.backgroundLarge,
       backgroundSmall: layout.backgroundSmall,
-      slots: (layout.slots as any) || [],
+      slots_desktop: layout.slots_desktop || [],
+      slots_mobile: layout.slots_mobile || null,
       createdAt: new Date(),
     };
     this.gameLayouts.set(newLayout.id, newLayout);
     return newLayout;
+  }
+
+  async updateGameLayout(id: string, updates: Partial<InsertGameLayout>): Promise<GameLayout> {
+    const existingLayout = this.gameLayouts.get(id);
+    if (!existingLayout) {
+      throw new Error(`Layout with id ${id} not found`);
+    }
+
+    const updatedLayout: GameLayout = {
+      ...existingLayout,
+      ...updates,
+      slots_desktop: updates.slots_desktop || existingLayout.slots_desktop,
+      slots_mobile: updates.slots_mobile || existingLayout.slots_mobile,
+    };
+
+    this.gameLayouts.set(id, updatedLayout);
+    return updatedLayout;
   }
 
   // User Progress

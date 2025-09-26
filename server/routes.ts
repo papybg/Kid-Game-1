@@ -55,6 +55,28 @@ export function registerRoutes(app: Express): void {
     }
   });
 
+  // Update layout
+  app.put("/api/layouts/:id", async (req, res) => {
+    try {
+      const storage = await getStorage();
+      const layoutId = req.params.id;
+      const updates = req.body;
+      
+      // Get existing layout
+      const existingLayout = await storage.getGameLayout(layoutId);
+      if (!existingLayout) {
+        return res.status(404).json({ message: "Layout not found" });
+      }
+      
+      // Update layout
+      const updatedLayout = await storage.updateGameLayout(layoutId, updates);
+      res.json(updatedLayout);
+    } catch (error) {
+      console.error('Failed to update layout:', error);
+      res.status(500).json({ message: "Failed to update layout" });
+    }
+  });
+
   // Get user progress
   app.get("/api/progress", async (req, res) => {
     try {

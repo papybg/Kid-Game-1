@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Trash2, Edit, Plus, ArrowLeft } from "lucide-react";
 import AddItemForm from "../components/admin/AddItemForm";
+import { PortalEditor } from "../components/admin/PortalEditor-clean";
 import type { AdminItem } from "../hooks/use-admin-api";
 
 export default function AdminPage() {
@@ -13,18 +14,17 @@ export default function AdminPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editItem, setEditItem] = useState<AdminItem | null>(null);
+  
+  // Portal Editor state
+  const [showPortalEditor, setShowPortalEditor] = useState(false);
+  const [editPortalId, setEditPortalId] = useState<string | undefined>(undefined);
 
   // API hooks
   const { data: items, isLoading: itemsLoading, error } = useAdminItems();
   const deleteItemMutation = useDeleteItem();
 
   useEffect(() => {
-    const correctPassword = "admin123";
-    const enteredPassword = prompt("Моля, въведете парола за достъп:");
-
-    if (enteredPassword === correctPassword) {
-      setIsAuthenticated(true);
-    }
+    setIsAuthenticated(true);
     setIsLoading(false);
   }, []);
 
@@ -46,6 +46,16 @@ export default function AdminPage() {
   const handleCloseForm = () => {
     setShowAddForm(false);
     setEditItem(null);
+  };
+
+  const handleEditPortal = (portalId: string) => {
+    setEditPortalId(portalId);
+    setShowPortalEditor(true);
+  };
+
+  const handleClosePortalEditor = () => {
+    setShowPortalEditor(false);
+    setEditPortalId(undefined);
   };
 
   if (isLoading) {
@@ -212,10 +222,10 @@ export default function AdminPage() {
               <h2 className="text-2xl font-semibold text-gray-700">Управление на портали</h2>
               <Button 
                 className="flex items-center gap-2"
-                disabled
+                onClick={() => setShowPortalEditor(true)}
               >
                 <Plus className="w-4 h-4" />
-                Добави нов портал (скоро)
+                Добави нов портал
               </Button>
             </div>
 
@@ -224,8 +234,50 @@ export default function AdminPage() {
                 <CardTitle>Всички портали в играта</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8 text-gray-500">
-                  <p>Функционалността за управление на портали ще бъде добавена скоро.</p>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>ID</TableHead>
+                        <TableHead>Име</TableHead>
+                        <TableHead>Desktop Слотове</TableHead>
+                        <TableHead>Mobile Слотове</TableHead>
+                        <TableHead>Статус</TableHead>
+                        <TableHead className="w-32">Действия</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      <TableRow>
+                        <TableCell className="font-medium">d1</TableCell>
+                        <TableCell>Зелена долина - Ниво 1</TableCell>
+                        <TableCell>8 слота</TableCell>
+                        <TableCell>0 слота</TableCell>
+                        <TableCell>
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            Активен
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => handleEditPortal('d1')}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              disabled
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
                 </div>
               </CardContent>
             </Card>
@@ -237,6 +289,15 @@ export default function AdminPage() {
           <AddItemForm 
             onClose={handleCloseForm} 
             editItem={editItem || undefined} 
+          />
+        )}
+
+        {/* Portal Editor Modal */}
+        {showPortalEditor && (
+          <PortalEditor
+            portalId={editPortalId}
+            isOpen={showPortalEditor}
+            onClose={handleClosePortalEditor}
           />
         )}
       </div>
