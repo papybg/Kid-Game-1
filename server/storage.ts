@@ -4,6 +4,8 @@ import {
   type GameLayout,
   type UserProgress,
   type GameSettings,
+  type GameVariant,
+  type CategoryIndex,
   type InsertPortal,
   type InsertGameItem,
   type InsertGameLayout,
@@ -18,6 +20,13 @@ export interface IStorage {
   getPortals(): Promise<Portal[]>;
   getPortal(id: string): Promise<Portal | undefined>;
   createPortal(portal: InsertPortal): Promise<Portal>;
+  updatePortal(id: string, updates: Partial<InsertPortal>): Promise<Portal>;
+
+  // Game Variants
+  getGameVariants(): Promise<GameVariant[]>;
+
+  // Categories
+  getCategoriesIndices(): Promise<CategoryIndex[]>;
 
   // Game Items
   getGameItems(): Promise<GameItem[]>;
@@ -43,6 +52,7 @@ export interface IStorage {
 export class MemStorage implements IStorage {
   private portals: Map<string, Portal> = new Map();
   private gameItems: Map<number, GameItem> = new Map();
+  private gameVariants: Map<string, GameVariant> = new Map();
   private gameLayouts: Map<string, GameLayout> = new Map();
   private userProgress: UserProgress[] = [];
   private gameSettings: GameSettings | undefined;
@@ -52,6 +62,35 @@ export class MemStorage implements IStorage {
   }
 
   private initializeDefaultData() {
+    // Initialize default game variants
+    const defaultVariants: GameVariant[] = [
+      {
+        id: 't1',
+        name: 'toddlers',
+        displayName: 'За мъници',
+        description: 'За деца 2-4 години - прости игри с малко елементи',
+        createdAt: new Date(),
+      },
+      {
+        id: 'k1',
+        name: 'kids',
+        displayName: 'За малчугани',
+        description: 'За деца 4-6 години - средна сложност',
+        createdAt: new Date(),
+      },
+      {
+        id: 'e1',
+        name: 'experts',
+        displayName: 'За батковци',
+        description: 'За деца 8+ години - сложни игри с много елементи',
+        createdAt: new Date(),
+      }
+    ];
+
+    defaultVariants.forEach(variant => {
+      this.gameVariants.set(variant.id, variant);
+    });
+
     // Initialize default portal
     const defaultPortal: Portal = {
       id: "dolina",
@@ -63,6 +102,7 @@ export class MemStorage implements IStorage {
       min_cells: 4,
       max_cells: 8,
       item_count_rule: "equals_cells",
+      variantSettings: {},
       isLocked: false,
       createdAt: new Date(),
     };
@@ -205,11 +245,40 @@ export class MemStorage implements IStorage {
       min_cells: portal.min_cells,
       max_cells: portal.max_cells,
       item_count_rule: portal.item_count_rule,
+      variantSettings: portal.variantSettings || {},
       isLocked: portal.isLocked ?? null,
       createdAt: new Date(),
     };
     this.portals.set(newPortal.id, newPortal);
     return newPortal;
+  }
+
+  async updatePortal(id: string, updates: Partial<InsertPortal>): Promise<Portal> {
+    const existingPortal = this.portals.get(id);
+    if (!existingPortal) {
+      throw new Error(`Portal with id ${id} not found`);
+    }
+
+    const updatedPortal: Portal = {
+      ...existingPortal,
+      ...updates,
+      layouts: updates.layouts ? [...updates.layouts] : existingPortal.layouts,
+      variantSettings: updates.variantSettings || existingPortal.variantSettings,
+    };
+
+    this.portals.set(id, updatedPortal);
+    return updatedPortal;
+  }
+
+  // Game Variants
+  async getGameVariants(): Promise<GameVariant[]> {
+    return Array.from(this.gameVariants.values());
+  }
+
+  // Categories
+  async getCategoriesIndices(): Promise<CategoryIndex[]> {
+    // For now, return an empty array as we don't have category indices implemented
+    return [];
   }
 
   // Game Items

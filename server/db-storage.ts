@@ -6,6 +6,8 @@ import {
   type GameLayout,
   type UserProgress,
   type GameSettings,
+  type GameVariant,
+  type CategoryIndex,
   type InsertPortal,
   type InsertGameItem,
   type InsertGameLayout,
@@ -16,6 +18,8 @@ import {
   gameLayouts,
   userProgress,
   gameSettings,
+  gameVariants,
+  categoriesIndices,
 } from "../shared/schema";
 
 export class DbStorage {
@@ -32,6 +36,29 @@ export class DbStorage {
   async createPortal(portal: InsertPortal): Promise<Portal> {
     const result = await db.insert(portals).values(portal).returning();
     return result[0];
+  }
+
+  async updatePortal(id: string, updates: Partial<InsertPortal>): Promise<Portal> {
+    const result = await db.update(portals)
+      .set(updates)
+      .where(eq(portals.id, id))
+      .returning();
+    
+    if (result.length === 0) {
+      throw new Error(`Portal with id ${id} not found`);
+    }
+    
+    return result[0];
+  }
+
+  // Game Variants
+  async getGameVariants(): Promise<GameVariant[]> {
+    return await db.select().from(gameVariants);
+  }
+
+  // Categories
+  async getCategoriesIndices(): Promise<CategoryIndex[]> {
+    return await db.select().from(categoriesIndices);
   }
 
   // Game Items

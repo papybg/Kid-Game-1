@@ -2,7 +2,7 @@ import { db } from "./db";
 import { portals, gameItems, gameLayouts } from "../shared/schema";
 import { eq, inArray, notInArray } from "drizzle-orm";
 
-// Helper функциите остават същите...
+// Helper functions
 function shuffleArray<T>(array: T[]): T[] {
   const shuffled = [...array];
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -11,9 +11,28 @@ function shuffleArray<T>(array: T[]): T[] {
   }
   return shuffled;
 }
+
 function selectRandom<T>(array: T[], count: number): T[] {
   const shuffled = shuffleArray(array);
   return shuffled.slice(0, count);
+}
+
+// Helper function to check if item can go in slot (hierarchical matching)
+function canItemGoInSlot(itemIndex: string, slotIndices: string[]): boolean {
+  // Check exact match first
+  if (slotIndices.includes(itemIndex)) {
+    return true;
+  }
+
+  // Check hierarchical match: item can go in parent category slot
+  // e.g., "rp" (firetruck) can go in "r" (transport) slot
+  for (const slotIndex of slotIndices) {
+    if (itemIndex.startsWith(slotIndex)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 // Интерфейсите остават същите...
@@ -28,9 +47,16 @@ export interface GameSession {
   layout: Layout;
 }
 
-export async function generateGameSession(portalId: string, deviceType: 'desktop' | 'mobile' = 'desktop', gameMode: 'simple' | 'advanced' = 'simple'): Promise<GameSession> {
+export async function generateGameSession(portalId: string, deviceType: 'desktop' | 'mobile' = 'desktop', gameMode: 'simple' | 'advanced' = 'simple', variantId?: string): Promise<GameSession> {
+  console.log(`[GameService] Looking for portal with ID: "${portalId}"`);
   const portal = await db.query.portals.findFirst({ where: eq(portals.id, portalId) });
   if (!portal) throw new Error(`Portal with id ${portalId} not found`);
+
+  // Get variant settings if variantId is provided
+  let variantSettings: { minCells: number; maxCells: number; hasExtraItems: boolean } | null = null;
+  if (variantId && portal.variantSettings) {
+    variantSettings = portal.variantSettings[variantId];
+  }
 
   const layout = await db.query.gameLayouts.findFirst({ where: eq(gameLayouts.id, portal.layouts[0]) });
   if (!layout) throw new Error(`Layout not found for portal ${portalId}`);
@@ -46,40 +72,65 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
   let maxPossibleCells = 0;
   const indexCounts: Record<string, number> = {};
 
-  // Count items per index
+  // Count items per index (exclude joker items from counting for regular cells)
   allItems.forEach(item => {
-    indexCounts[item.index] = (indexCounts[item.index] || 0) + 1;
+    if (item.index !== 'js') { // Don't count joker items for regular cell calculations
+      indexCounts[item.index] = (indexCounts[item.index] || 0) + 1;
+    }
   });
 
   // Calculate maximum cells we can support (each cell needs at least one item)
   slots.forEach(slot => {
-    const maxItemsForSlot = Math.max(...slot.index.map(idx => indexCounts[idx] || 0));
-    if (maxItemsForSlot > 0) {
+    const hasMatchingItem = slot.index.some(slotIdx => 
+      allItems.some(item => 
+        item.index !== 'js' && canItemGoInSlot(item.index, [slotIdx])
+      )
+    );
+    if (hasMatchingItem) {
       maxPossibleCells++;
     }
   });
 
-  // Limit cell count to what's actually possible
-  const targetCellCount = Math.floor(Math.random() * (portal.max_cells - portal.min_cells + 1)) + portal.min_cells;
-  const actualCellCount = Math.min(targetCellCount, maxPossibleCells, portal.max_cells);
+  // Determine cell count based on variant settings or fallback to portal settings
+  let targetCellCount: number;
+  if (variantSettings) {
+    if (variantSettings.minCells === variantSettings.maxCells) {
+      // Exact number of cells
+      targetCellCount = variantSettings.minCells;
+    } else {
+      // Random between min and max
+      targetCellCount = Math.floor(Math.random() * (variantSettings.maxCells - variantSettings.minCells + 1)) + variantSettings.minCells;
+    }
+  } else {
+    // Fallback to old logic
+    targetCellCount = Math.floor(Math.random() * (portal.max_cells - portal.min_cells + 1)) + portal.min_cells;
+  }
+
+  const actualCellCount = Math.min(targetCellCount, maxPossibleCells, variantSettings ? variantSettings.maxCells : portal.max_cells);
 
   // Ensure we have at least min_cells if possible
-  const finalCellCount = Math.max(actualCellCount, Math.min(portal.min_cells, maxPossibleCells));
+  const minCells = variantSettings ? variantSettings.minCells : portal.min_cells;
+  const finalCellCount = Math.max(actualCellCount, Math.min(minCells, maxPossibleCells));
 
   if (finalCellCount === 0) {
     throw new Error('No valid cells can be created - not enough items for any slot indices');
   }
 
-  // Select cells that have available items
+  // Select cells that have available items (using hierarchical matching)
   const validSlots = slots.filter(slot =>
-    slot.index.some(idx => (indexCounts[idx] || 0) > 0)
+    slot.index.some(slotIdx => 
+      allItems.some(item => 
+        item.index !== 'js' && canItemGoInSlot(item.index, [slotIdx])
+      )
+    )
   );
 
   const selectedCells = selectRandom(validSlots, finalCellCount);
-  const requiredIndices = [...new Set(selectedCells.flatMap(cell => cell.index))];
 
-  // Get items for required indices
-  const correctItemsPool = allItems.filter(item => requiredIndices.includes(item.index));
+  // Get items for selected cells (using hierarchical matching)
+  const correctItemsPool = allItems.filter(item => 
+    item.index !== 'js' && selectedCells.some(cell => canItemGoInSlot(item.index, cell.index))
+  );
 
   // Select correct items for each cell (guaranteed to have at least one per cell)
   const selectedCorrectItems: Item[] = [];
@@ -87,7 +138,7 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
 
   for (const cell of selectedCells) {
     const matchingItems = correctItemsPool.filter(item =>
-      cell.index.includes(item.index) && !usedItemIds.has(item.id)
+      canItemGoInSlot(item.index, cell.index) && !usedItemIds.has(item.id)
     );
 
     if (matchingItems.length > 0) {
@@ -95,8 +146,8 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
       selectedCorrectItems.push(randomItem);
       usedItemIds.add(randomItem.id);
     } else {
-      // Fallback: allow reusing items if we run out (shouldn't happen with proper validation)
-      const fallbackItems = correctItemsPool.filter(item => cell.index.includes(item.index));
+      // Fallback: allow reusing items if we run out
+      const fallbackItems = correctItemsPool.filter(item => canItemGoInSlot(item.index, cell.index));
       if (fallbackItems.length > 0) {
         const randomItem = selectRandom(fallbackItems, 1)[0];
         selectedCorrectItems.push(randomItem);
@@ -105,31 +156,93 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
     }
   }
 
+  // JOKER LOGIC: If we don't have enough correct items, add joker items
+  const missingCount = finalCellCount - selectedCorrectItems.length;
+  if (missingCount > 0) {
+    // Find joker items
+    const jokerItems = allItems.filter(item => item.index === 'js');
+    if (jokerItems.length > 0) {
+      // Add joker items to fill the gap
+      for (let i = 0; i < Math.min(missingCount, jokerItems.length); i++) {
+        selectedCorrectItems.push(jokerItems[i]);
+        usedItemIds.add(jokerItems[i].id);
+      }
+    }
+  }
+
   // Calculate total items needed
   const totalItemCount = gameMode === 'advanced' ? 8 : 6;
   const neededConfusing = Math.max(0, totalItemCount - selectedCorrectItems.length);
 
-  // Add confusing items from remaining items
+  // Add confusing items from remaining items (exclude joker items and already used items)
   let confusingItems: Item[] = [];
   if (neededConfusing > 0) {
-    const availableConfusingItems = allItems.filter(item => !usedItemIds.has(item.id));
-    confusingItems = selectRandom(availableConfusingItems, Math.min(neededConfusing, availableConfusingItems.length));
+    const availableConfusingItems = allItems.filter(item => 
+      !usedItemIds.has(item.id) && item.index !== 'js'
+    );
+    const selectedConfusing = selectRandom(availableConfusingItems, Math.min(neededConfusing, availableConfusingItems.length));
+    confusingItems = selectedConfusing;
+    // Add to used items
+    selectedConfusing.forEach(item => usedItemIds.add(item.id));
   }
 
-  // If we still don't have enough items, fill with any remaining items (allow duplicates in extreme cases)
+  // If we still don't have enough items, fill with any remaining items (avoid duplicates if possible)
   const finalItems = [...selectedCorrectItems, ...confusingItems];
   if (finalItems.length < totalItemCount) {
     const remainingNeeded = totalItemCount - finalItems.length;
-    const additionalItems = selectRandom(allItems, remainingNeeded);
-    finalItems.push(...additionalItems);
+    const usedItemIdsSet = new Set(finalItems.map(item => item.id));
+    const availableItems = allItems.filter(item => 
+      item.index !== 'js' && !usedItemIdsSet.has(item.id)
+    );
+    
+    if (availableItems.length >= remainingNeeded) {
+      // We have enough unique items
+      const additionalItems = selectRandom(availableItems, remainingNeeded);
+      finalItems.push(...additionalItems);
+    } else {
+      // Not enough unique items, use what we have and allow some duplicates
+      finalItems.push(...availableItems);
+      const stillNeeded = remainingNeeded - availableItems.length;
+      if (stillNeeded > 0) {
+        const duplicateItems = selectRandom(
+          allItems.filter(item => item.index !== 'js'), 
+          stillNeeded
+        );
+        finalItems.push(...duplicateItems);
+      }
+    }
   }
 
   const shuffledItems = shuffleArray(finalItems);
 
+  // Ако все още няма достатъчно предмети, добави обект "тест"
+  if (shuffledItems.length < totalItemCount) {
+    const testItem = {
+      id: 9999,
+      name: "test",
+      image: "/images/1758906998565-smile.png",
+      index: "z",
+      category: "тест",
+      audio: null,
+      createdAt: null
+    };
+    while (shuffledItems.length < totalItemCount) {
+      shuffledItems.push(testItem);
+    }
+  }
+
+  // Determine level type based on variant settings or fallback
+  let levelType: 'equals_cells' | 'cells_plus_two';
+  if (variantSettings) {
+    levelType = variantSettings.hasExtraItems ? 'cells_plus_two' : 'equals_cells';
+  } else {
+    levelType = gameMode === 'advanced' ? 'cells_plus_two' : 'equals_cells';
+  }
+
   return {
     cells: selectedCells,
     items: shuffledItems,
-    levelType: gameMode === 'advanced' ? 'cells_plus_two' : 'equals_cells',
+    levelType: levelType,
     layout: layout,
   };
 }

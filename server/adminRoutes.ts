@@ -3,7 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import { db } from './db';
 import { gameItems, insertGameItemSchema, categoriesIndices, insertCategoriesIndicesSchema } from '../shared/schema';
-import { eq } from 'drizzle-orm';
+import { eq, or, sql } from 'drizzle-orm';
 
 const router = Router();
 
@@ -253,6 +253,38 @@ router.delete('/items/:id', async (req, res) => {
   } catch (error) {
     console.error('Error deleting item:', error);
     res.status(500).json({ error: 'Failed to delete item' });
+  }
+});
+
+// DELETE /api/admin/categories/cleanup - delete category indices with empty or null description
+router.delete('/categories/cleanup', async (req, res) => {
+  try {
+    // Guard: require explicit confirm=true query param to run
+    const confirm = req.query.confirm === 'true';
+    if (!confirm) {
+      return res.status(400).json({ error: 'Confirm deletion by adding ?confirm=true to the request' });
+    }
+
+    // Prevent running in production accidentally
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({ error: 'Cleanup endpoint is disabled in production' });
+    }
+
+    // Use raw SQL to check for NULL or empty description (avoids TypeScript overload issues)
+    const preview = await db.select().from(categoriesIndices).where(sql`(${categoriesIndices.description} IS NULL OR ${categoriesIndices.description} = '')`);
+
+    // If nothing to delete, return early
+    if (!preview || preview.length === 0) {
+      return res.json({ deletedCount: 0, rows: [] });
+    }
+
+    // Perform delete using raw SQL
+    await db.execute(sql`DELETE FROM categories_indices WHERE description IS NULL OR description = ''`);
+
+    return res.json({ deletedCount: preview.length, rows: preview });
+  } catch (error) {
+    console.error('Error cleaning categories:', error);
+    res.status(500).json({ error: 'Failed to clean categories' });
   }
 });
 

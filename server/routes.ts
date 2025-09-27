@@ -37,6 +37,64 @@ export function registerRoutes(app: Express): void {
     }
   });
 
+  // Get specific portal
+  app.get("/api/portals/:id", async (req, res) => {
+    try {
+      const storage = await getStorage();
+      const portal = await storage.getPortal(req.params.id);
+      if (!portal) {
+        return res.status(404).json({ message: "Portal not found" });
+      }
+      res.json(portal);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch portal" });
+    }
+  });
+
+  // Get specific portal with full data (portal + layout)
+  app.get("/api/portals/:id/full", async (req, res) => {
+    try {
+      const storage = await getStorage();
+      // Decode URL-encoded portal ID (handles spaces and special characters)
+      const portalId = decodeURIComponent(req.params.id);
+
+      // Get portal data
+      const portal = await storage.getPortal(portalId);
+      if (!portal) {
+        return res.status(404).json({ message: "Portal not found" });
+      }
+
+      // Get layout data if portal has layouts
+      let layout = null;
+      if (portal.layouts && portal.layouts.length > 0) {
+        const layoutId = portal.layouts[0]; // Get first layout
+        layout = await storage.getGameLayout(layoutId);
+        console.log(`Loaded layout ${layoutId} for portal ${portalId}`);
+      }
+
+      // Return combined data
+      res.json({
+        portal,
+        layout
+      });
+
+    } catch (error) {
+      console.error('Failed to fetch full portal data:', error);
+      res.status(500).json({ message: "Failed to fetch portal data" });
+    }
+  });
+
+  // Get all game variants
+  app.get("/api/game-variants", async (req, res) => {
+    try {
+      const storage = await getStorage();
+      const variants = await storage.getGameVariants();
+      res.json(variants);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch game variants" });
+    }
+  });
+
   // Create new portal
   app.post("/api/portals", async (req, res) => {
     try {
@@ -76,6 +134,29 @@ export function registerRoutes(app: Express): void {
     }
   });
 
+  // PATCH portal (partial update)
+  app.patch("/api/portals/:id", async (req, res) => {
+    try {
+      const storage = await getStorage();
+      // Decode URL-encoded portal ID (handles spaces and special characters)
+      const portalId = decodeURIComponent(req.params.id);
+      const updates = req.body;
+      
+      const existingPortal = await storage.getPortal(portalId);
+      if (!existingPortal) {
+        return res.status(404).json({ message: "Portal not found" });
+      }
+      
+      // Apply partial updates and save to database
+      const updatedPortal = await storage.updatePortal(portalId, updates);
+      
+      res.json(updatedPortal);
+    } catch (error) {
+      console.error('Failed to patch portal:', error);
+      res.status(500).json({ message: "Failed to update portal" });
+    }
+  });
+
   // Get all game items
   app.get("/api/game-items", async (req, res) => {
     try {
@@ -84,6 +165,17 @@ export function registerRoutes(app: Express): void {
       res.json(items);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch game items" });
+    }
+  });
+
+  // Get all categories/indices
+  app.get("/api/admin/categories", async (req, res) => {
+    try {
+      const storage = await getStorage();
+      const categories = await storage.getCategoriesIndices();
+      res.json(categories);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch categories" });
     }
   });
 
@@ -198,9 +290,13 @@ export function registerRoutes(app: Express): void {
   app.get("/api/game-session/:portalId", async (req, res) => {
     try {
       const { portalId } = req.params;
+      // Decode URL-encoded portal ID (handles spaces and special characters)
+      const decodedPortalId = decodeURIComponent(portalId);
+      console.log(`Original portalId: "${portalId}", Decoded: "${decodedPortalId}"`);
       const deviceType = (req.query.device as 'desktop' | 'mobile') || 'desktop';
       const gameMode = (req.query.mode as 'simple' | 'advanced') || 'simple';
-      const sessionData = await generateGameSession(portalId, deviceType, gameMode);
+      const variantId = req.query.variant as string | undefined;
+      const sessionData = await generateGameSession(decodedPortalId, deviceType, gameMode, variantId);
       res.json(sessionData);
     } catch (error) {
       console.error('Error generating game session:', error);

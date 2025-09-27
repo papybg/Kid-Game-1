@@ -6,6 +6,15 @@ import { z } from "zod";
 // Enums
 export const itemCountRuleEnum = pgEnum('item_count_rule', ['equals_cells', 'cells_plus_two']);
 
+// Game Variants (difficulty levels for different age groups)
+export const gameVariants = pgTable("game_variants", {
+  id: varchar("id").primaryKey(),
+  name: text("name").notNull(), // internal name like 'toddlers', 'kids', 'advanced'
+  displayName: text("display_name").notNull(), // display name like 'За мъници', 'За малчугани'
+  description: text("description"), // optional description
+  createdAt: timestamp("created_at").default(sql`now()`),
+});
+
 // Game Portals
 export const portals = pgTable("portals", {
   id: varchar("id").primaryKey(),
@@ -17,6 +26,11 @@ export const portals = pgTable("portals", {
   min_cells: integer("min_cells").notNull(),
   max_cells: integer("max_cells").notNull(),
   item_count_rule: itemCountRuleEnum("item_count_rule").notNull(),
+  variantSettings: jsonb("variant_settings").notNull().$type<Record<string, {
+    minCells: number;
+    maxCells: number;
+    hasExtraItems: boolean;
+  }>>(),
   isLocked: boolean("is_locked").default(false),
   createdAt: timestamp("created_at").default(sql`now()`),
 });
@@ -100,6 +114,12 @@ export const insertCategoriesIndicesSchema = z.object({
   indexValue: z.string(),
   description: z.string().optional(),
 });
+export const insertGameVariantSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  displayName: z.string(),
+  description: z.string().optional(),
+});
 
 // Types
 export type Portal = typeof portals.$inferSelect;
@@ -108,6 +128,7 @@ export type GameLayout = typeof gameLayouts.$inferSelect;
 export type UserProgress = typeof userProgress.$inferSelect;
 export type GameSettings = typeof gameSettings.$inferSelect;
 export type CategoryIndex = typeof categoriesIndices.$inferSelect;
+export type GameVariant = typeof gameVariants.$inferSelect;
 
 export type InsertPortal = z.infer<typeof insertPortalSchema>;
 export type InsertGameItem = z.infer<typeof insertGameItemSchema>;
@@ -115,6 +136,7 @@ export type InsertGameLayout = z.infer<typeof insertGameLayoutSchema>;
 export type InsertUserProgress = z.infer<typeof insertUserProgressSchema>;
 export type InsertGameSettings = z.infer<typeof insertGameSettingsSchema>;
 export type InsertCategoryIndex = z.infer<typeof insertCategoriesIndicesSchema>;
+export type InsertGameVariant = z.infer<typeof insertGameVariantSchema>;
 
 // Game-specific types
 export interface GameSlot {

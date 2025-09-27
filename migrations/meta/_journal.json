@@ -50,6 +50,13 @@
       "when": 1758570476550,
       "tag": "0006_natural_green_goblin",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1758910086909,
+      "tag": "0007_clever_exiles",
+      "breakpoints": true
     }
   ]
 }

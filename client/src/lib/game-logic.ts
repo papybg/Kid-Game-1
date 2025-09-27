@@ -94,7 +94,20 @@ export function formatTime(seconds: number): string {
 }
 
 export function isValidChoice(slot: GameSlot, item: GameItem): boolean {
-  return slot.index.includes(item.index);
+  // Check exact match first
+  if (slot.index.includes(item.index)) {
+    return true;
+  }
+
+  // Check hierarchical match: item can go in parent category
+  // e.g., "rp" (firetruck) can go in "r" (transport) slot
+  for (const slotIndex of slot.index) {
+    if (item.index.startsWith(slotIndex)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 export function getRandomSlot(availableSlots: GameSlot[]): GameSlot | null {

@@ -10,15 +10,17 @@ import { useGameState } from "../hooks/use-game-state";
 import { useAudioContext } from "../components/audio-manager";
 import { useSettingsStore } from "../lib/settings-store";
 import { fetchGameSession } from "../lib/api";
+import { isValidChoice } from "../lib/game-logic";
 import type { GameItem, GameSlot as Slot } from "@shared/schema";
 
 interface GameProps {
   portalId: string;
+  variantId?: string;
   onBackToMenu: () => void;
   onWin: () => void;
 }
 
-export default function Game({ portalId, onBackToMenu, onWin }: GameProps) {
+export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameProps) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [disappearingItems, setDisappearingItems] = useState<Set<number>>(new Set());
   const [selectedItem, setSelectedItem] = useState<GameItem | null>(null);
@@ -31,8 +33,8 @@ export default function Game({ portalId, onBackToMenu, onWin }: GameProps) {
   const { gameMode } = useSettingsStore();
   
   const { data: gameSession, isLoading: sessionLoading, error: sessionError } = useQuery({
-    queryKey: ['gameSession', portalId, isMobile ? 'mobile' : 'desktop', gameMode],
-    queryFn: () => fetchGameSession(portalId, isMobile ? 'mobile' : 'desktop', gameMode),
+    queryKey: ['gameSession', portalId, isMobile ? 'mobile' : 'desktop', gameMode, variantId],
+    queryFn: () => fetchGameSession(portalId, isMobile ? 'mobile' : 'desktop', gameMode, variantId),
     enabled: !!portalId,
   });
 
@@ -131,7 +133,7 @@ export default function Game({ portalId, onBackToMenu, onWin }: GameProps) {
         setSelectedItem(item);
         showFeedback('success', 'КЪДЕ ЩЕ СЛОЖИШ ТОВА');
       } else if (selectedItem.id === item.id) {
-        const targetSlot = gameState.availableSlots.find(slot => slot.index.includes(item.index));
+        const targetSlot = gameState.availableSlots.find(slot => isValidChoice(slot, item));
         if (!targetSlot) {
           showFeedback('error', 'Няма място за този предмет!');
           playVoice('tryAgain');
@@ -149,7 +151,7 @@ export default function Game({ portalId, onBackToMenu, onWin }: GameProps) {
         playVoice('tryAgain');
         return;
       }
-      if (!activeSlot.index.includes(item.index)) {
+      if (!isValidChoice(activeSlot, item)) {
         showFeedback('error', 'Опитай пак!');
         playVoice('tryAgain');
         return;

@@ -183,9 +183,10 @@ export default function AddItemForm({ onClose, editItem }: AddItemFormProps) {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             {/* Name Field */}
             <div className="space-y-2">
-              <Label htmlFor="name">Име на обекта *</Label>
+              <Label htmlFor="item-name">Име на обекта *</Label>
               <Input
-                id="name"
+                id="item-name"
+                autoComplete="off"
                 {...register("name", { 
                   required: "Името е задължително",
                   minLength: { value: 2, message: "Името трябва да е поне 2 символа" }
@@ -199,7 +200,7 @@ export default function AddItemForm({ onClose, editItem }: AddItemFormProps) {
 
             {/* Category Field - From API */}
             <div className="space-y-2">
-              <Label htmlFor="category">Категория *</Label>
+              <Label htmlFor="item-category">Категория *</Label>
               {categoriesLoading ? (
                 <div className="flex items-center gap-2 p-2 border rounded">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
@@ -226,15 +227,15 @@ export default function AddItemForm({ onClose, editItem }: AddItemFormProps) {
 
             {/* Index Field - Select from existing or add new */}
             <div className="space-y-2">
-              <Label htmlFor="index">Индекс *</Label>
+              <Label htmlFor="item-index">Индекс *</Label>
               <div className="flex gap-2">
                 <Select onValueChange={(value) => setValue("index", value)}>
                   <SelectTrigger className="flex-1">
                     <SelectValue placeholder="Избери индекс" />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableIndexes.map((idx) => (
-                      <SelectItem key={idx.indexValue} value={idx.indexValue}>
+                    {availableIndexes.map((idx, i) => (
+                      <SelectItem key={selectedCategory + '-' + idx.indexValue + '-' + i} value={idx.indexValue}>
                         {idx.indexValue} {idx.description && `(${idx.description})`}
                       </SelectItem>
                     ))}
@@ -267,9 +268,10 @@ export default function AddItemForm({ onClose, editItem }: AddItemFormProps) {
                 )}
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <Label htmlFor="new-index">Индекс *</Label>
+                    <Label htmlFor="item-new-index">Индекс *</Label>
                     <Input
-                      id="new-index"
+                      id="item-new-index"
+                      autoComplete="off"
                       value={newIndexValue}
                       onChange={(e) => setNewIndexValue(e.target.value.toLowerCase())}
                       placeholder="напр. z"
@@ -278,9 +280,10 @@ export default function AddItemForm({ onClose, editItem }: AddItemFormProps) {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="new-description">Описание</Label>
+                    <Label htmlFor="item-new-description">Описание</Label>
                     <Input
-                      id="new-description"
+                      id="item-new-description"
+                      autoComplete="off"
                       value={newIndexDescription}
                       onChange={(e) => setNewIndexDescription(e.target.value)}
                       placeholder="Описание на индекса"

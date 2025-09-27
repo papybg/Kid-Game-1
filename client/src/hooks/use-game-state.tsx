@@ -1,5 +1,6 @@
 import React from 'react';
-import type { GameItem, Slot } from '@shared/schema';
+import { isValidChoice } from '../lib/game-logic';
+import type { GameItem, GameSlot as Slot } from '@shared/schema';
 
 interface UseGameStateProps {
   cells: Slot[] | undefined;
@@ -75,7 +76,7 @@ export function useGameState({ cells, items }: UseGameStateProps) {
 
   const makeChoice = React.useCallback((item: GameItem, slot: Slot, isSimpleMode: boolean) => {
     const slotId = `${slot.position.top}-${slot.position.left}`;
-    const isValid = slot.index.includes(item.index);
+    const isValid = isValidChoice(slot, item);
 
     if (isValid) {
       setGameState(prev => {

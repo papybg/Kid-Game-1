@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import { portals, gameItems, gameLayouts, categoriesIndices } from './shared/schema.js';
+import { portals, gameItems, gameLayouts, categoriesIndices } from './shared/schema.ts';
 import { config } from 'dotenv';
 
 config();

@@ -10,10 +10,13 @@ export async function fetchPortals(): Promise<Portal[]> {
   return response.json();
 }
 
-export async function fetchGameSession(portalId: string, deviceType: 'desktop' | 'mobile' = 'desktop', gameMode: 'simple' | 'advanced' = 'simple'): Promise<GameSession> {
+export async function fetchGameSession(portalId: string, deviceType: 'desktop' | 'mobile' = 'desktop', gameMode: 'simple' | 'advanced' = 'simple', variantId?: string): Promise<GameSession> {
   const url = new URL(`http://localhost:3005/api/game-session/${portalId}`);
   url.searchParams.set('device', deviceType);
   url.searchParams.set('mode', gameMode);
+  if (variantId) {
+    url.searchParams.set('variant', variantId);
+  }
   
   const response = await fetch(url.toString());
   if (!response.ok) {

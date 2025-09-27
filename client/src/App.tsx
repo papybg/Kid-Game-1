@@ -7,18 +7,20 @@ import { ThemeProvider } from "./components/theme-provider";
 import { AudioProvider } from "./components/audio-manager";
 
 import Welcome from "./pages/welcome";
+import VariantSelection from "./pages/variant-selection";
 import PortalSelection from "./pages/portal-selection";
 import Game from "./pages/game";
 import Win from "./pages/win";
 import AdminPage from "./pages/admin";
 
-import type { Portal } from "@shared/schema";
+import type { Portal, GameVariant } from "@shared/schema";
 
-type Screen = "welcome" | "portals" | "game" | "win" | "admin";
+type Screen = "welcome" | "variants" | "portals" | "game" | "win" | "admin";
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>("welcome");
   const [selectedPortal, setSelectedPortal] = useState<Portal | null>(null);
+  const [selectedVariant, setSelectedVariant] = useState<GameVariant | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [gameKey, setGameKey] = useState(0); // Key to force Game component remount
 
@@ -44,11 +46,22 @@ function App() {
   }, []);
 
   const handleEnterGame = () => {
-    setCurrentScreen("portals");
+    setCurrentScreen("variants");
   };
 
   const handleBackToWelcome = () => {
     setCurrentScreen("welcome");
+    setSelectedPortal(null);
+    setSelectedVariant(null);
+  };
+
+  const handleSelectVariant = (variant: GameVariant) => {
+    setSelectedVariant(variant);
+    setCurrentScreen("portals");
+  };
+
+  const handleBackToVariants = () => {
+    setCurrentScreen("variants");
     setSelectedPortal(null);
   };
 
@@ -60,6 +73,7 @@ function App() {
   const handleBackToMenu = () => {
     setCurrentScreen("welcome");
     setSelectedPortal(null);
+    setSelectedVariant(null);
   };
 
   const handleWin = () => {
@@ -103,17 +117,25 @@ function App() {
                 />
               )}
               
+              {currentScreen === "variants" && (
+                <VariantSelection
+                  onSelectVariant={handleSelectVariant}
+                  onBackToWelcome={handleBackToWelcome}
+                />
+              )}
+              
               {currentScreen === "portals" && (
                 <PortalSelection
-                  onBackToWelcome={handleBackToWelcome}
+                  onBackToWelcome={handleBackToVariants}
                   onSelectPortal={handleSelectPortal}
                 />
               )}
               
-              {currentScreen === "game" && selectedPortal && (
+              {currentScreen === "game" && selectedPortal && selectedVariant && (
                 <Game
                   key={gameKey}
                   portalId={selectedPortal.id}
+                  variantId={selectedVariant.id}
                   onBackToMenu={handleBackToMenu}
                   onWin={handleWin}
                 />

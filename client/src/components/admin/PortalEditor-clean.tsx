@@ -5,6 +5,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Checkbox } from '../ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { X, Save, Trash2, Upload } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -14,6 +15,21 @@ interface Slot {
   position: { top: string; left: string };
   diameter: string;
   index: string[];
+}
+
+interface GameVariant {
+  id: string;
+  name: string;
+  displayName: string;
+  description?: string;
+}
+
+interface VariantSettings {
+  [variantId: string]: {
+    minCells: number;
+    maxCells: number;
+    hasExtraItems: boolean;
+  };
 }
 
 interface PortalEditorProps {
@@ -32,7 +48,7 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
   
   // Current tab state
   const [activeTab, setActiveTab] = useState('desktop');
-  
+  // ...existing code...
   // Icon management state
   const [selectedIcon, setSelectedIcon] = useState<string | null>(null);
   const [availableIcons, setAvailableIcons] = useState<string[]>([]);
@@ -44,6 +60,10 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
     mobile?: string;
     icon?: string;
   }>({});
+
+  // Variant settings state
+  const [variantSettings, setVariantSettings] = useState<VariantSettings>({});
+  const [availableVariants, setAvailableVariants] = useState<GameVariant[]>([]);
 
   // Desktop Canvas State (single source for both desktop and mobile)
   const [desktopSlots, setDesktopSlots] = useState<Slot[]>([]);
@@ -67,6 +87,8 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
   // Computed background image path
   const backgroundImage = backgroundFileName ? `/images/backgrounds/${backgroundFileName}` : '';
   
+  console.log('Background image URL:', backgroundImage, 'backgroundFileName:', backgroundFileName);
+  
   // Available background files
   const availableBackgrounds = [
     { value: 'dolina-large.png', label: 'Долина (Голяма)', size: { width: 1920, height: 1080 } },
@@ -75,21 +97,21 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
 
   // Available indices for dropdown - loaded from database
   const [availableIndices, setAvailableIndices] = useState([
-    { value: 'h', label: 'h - домашни' },
-    { value: 'p', label: 'p - селскостопански' },
-    { value: 'i', label: 'i - транспорт (влак)' },
-    { value: 'r', label: 'r - транспорт (кола)' },
-    { value: 's', label: 's - транспорт/птици' },
-    { value: 'j', label: 'j - джунгла' },
-    { value: 'l', label: 'l - джунгла (лъв)' },
-    { value: 'o', label: 'o - океан' },
-    { value: 'd', label: 'd - други' },
-    { value: 'f', label: 'f - други' },
-    { value: 'z', label: 'z - неясна категория' },
-    { value: 'sa', label: 'sa - транспорт (автобус/самолет/балон)' },
-    { value: 'sg', label: 'sg - транспорт (самолет)' },
-    { value: 'rg', label: 'rg - транспорт (garbage)' },
-    { value: 'rp', label: 'rp - транспорт (пожарна)' }
+  { value: 'h', label: 'h - домашни' },
+  { value: 'p', label: 'p - селскостопански' },
+  { value: 'i', label: 'i - транспорт (влак)' },
+  { value: 'r', label: 'r - транспорт (кола)' },
+  { value: 's', label: 's - транспорт/птици' },
+  { value: 'j', label: 'j - джунгла' },
+  { value: 'l', label: 'l - джунгла (лъв)' },
+  { value: 'o', label: 'o - океан' },
+  { value: 'd', label: 'd - други' },
+  { value: 'f', label: 'f - гора' },
+  { value: 'z', label: 'z - неясна категория' },
+  { value: 'sa', label: 'sa - въздушен транспорт' },
+  { value: 'sg', label: 'sg - транспорт (самолет)' },
+  { value: 'rg', label: 'rg - транспорт (garbage)' },
+  { value: 'rp', label: 'rp - транспорт (пожарна)' }
   ]);
 
   // Load existing data when editing
@@ -245,9 +267,27 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
       let portalIdToUse: string;
 
       if (portalId) {
-        // Editing existing portal
+        // Editing existing portal - update portal data with variant settings
         portalIdToUse = portalId;
-        layoutId = portalId;
+        layoutId = portalId; // For existing portals, layoutId is the same as portalId
+
+        const portalUpdateData = {
+          variantSettings: variantSettings
+        };
+
+        const portalUpdateResponse = await fetch(`http://localhost:3005/api/portals/${portalId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(portalUpdateData)
+        });
+
+        if (!portalUpdateResponse.ok) {
+          console.warn('Failed to update portal variant settings, but continuing with layout update');
+        } else {
+          console.log('Portal variant settings updated successfully');
+        }
       } else {
         // Creating new portal - generate IDs
         // Get existing portals to find next available ID
@@ -279,6 +319,7 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
           min_cells: Math.max(1, desktopSlots.length - 2),
           max_cells: desktopSlots.length + 2,
           item_count_rule: "equals_cells",
+          variantSettings: variantSettings,
           isLocked: false
         };
 
@@ -335,6 +376,9 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
       // Refresh portals list in admin panel
       queryClient.invalidateQueries({ queryKey: ["admin-portals"] });
       
+      // Also invalidate game session cache for this portal
+      queryClient.invalidateQueries({ queryKey: ["gameSession", portalIdToUse] });
+      
       onClose();
     } catch (error) {
       console.error('Failed to save portal:', error);
@@ -352,29 +396,38 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
       
       try {
         console.log(`Attempting to load data for portal: ${portalId}`);
-        const response = await fetch(`http://localhost:3005/api/layouts/${portalId}`);
+        
+        // Load both portal and layout data in one request
+        const response = await fetch(`http://localhost:3005/api/portals/${portalId}/full`);
         
         if (response.ok) {
-          const layoutData = await response.json();
+          const data = await response.json();
+          const { portal, layout } = data;
           
-          // Load portal settings
-          setPortalName(layoutData.name || '');
-          if (layoutData.backgroundLarge) {
-            const fileName = layoutData.backgroundLarge.split('/').pop() || 'dolina-large.png';
+          console.log('Loaded portal data:', portal);
+          console.log('Loaded layout data:', layout);
+          
+          // Load portal settings from portal data
+          setPortalName(portal.portalName || '');
+          if (layout?.backgroundLarge) {
+            const fileName = layout.backgroundLarge.split('/').pop() || 'dolina-large.png';
             setBackgroundFileName(fileName);
           }
           
           // Load desktop slots
-          if (layoutData.slots_desktop && Array.isArray(layoutData.slots_desktop)) {
-            setDesktopSlots(layoutData.slots_desktop);
+          if (layout?.slots_desktop && Array.isArray(layout.slots_desktop)) {
+            setDesktopSlots(layout.slots_desktop);
           }
           
-          console.log('Successfully loaded layout data:', layoutData);
+          // Load mobile slots if available (they will be scaled from desktop slots)
+          // Mobile slots are computed from desktop slots with MOBILE_SIZE_SCALE
+          
+          console.log('Successfully loaded portal and layout data');
         } else if (response.status === 404) {
           // Portal doesn't exist - this is normal for new portals
           console.log(`Portal ${portalId} not found - this is expected for new portals`);
         } else {
-          console.error(`Failed to load portal ${portalId}: ${response.status}`);
+          console.error(`Failed to load portal data: ${response.status}`);
         }
       } catch (error) {
         console.error('Failed to load portal data:', error);
@@ -400,6 +453,7 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
       setSelectedSlot(null);
       setIsDragging(false);
       setDragOffset({ x: 0, y: 0 });
+      setVariantSettings({});
     }
   }, [isOpen]);
 
@@ -454,9 +508,26 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
       }
     };
 
+    // Load available variants
+    const loadVariants = async () => {
+      try {
+        const response = await fetch('http://localhost:3005/api/game-variants');
+        if (response.ok) {
+          const variants = await response.json();
+          setAvailableVariants(variants);
+          console.log('Loaded variants:', variants);
+        } else {
+          console.log('Failed to load variants');
+        }
+      } catch (error) {
+        console.error('Failed to load variants:', error);
+      }
+    };
+
     if (isOpen) {
       loadIcons();
       loadCategories();
+      loadVariants();
     }
   }, [isOpen]);
 
@@ -533,6 +604,8 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
         mobile: result.mobile,
         icon: result.icon
       });
+
+      console.log('Background image set to:', `/images/backgrounds/${result.desktop}`);
 
       alert(`Фонът е качен успешно! Създадени са файлове:\n- Desktop: ${result.desktop}\n- Mobile: ${result.mobile}\n- Icon: ${result.icon}`);
 
@@ -649,10 +722,11 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
           {/* Main Content Area */}
           <div className="flex-1 overflow-hidden">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-              <TabsList className="grid w-full grid-cols-3 mx-3 mt-2 mb-0">
+              <TabsList className="grid w-full grid-cols-4 mx-3 mt-2 mb-0">
                 <TabsTrigger value="desktop" className="text-sm">Desktop</TabsTrigger>
                 <TabsTrigger value="mobile" className="text-sm">Mobile</TabsTrigger>
                 <TabsTrigger value="icon" className="text-sm">Икони</TabsTrigger>
+                <TabsTrigger value="variants" className="text-sm">Варианти</TabsTrigger>
               </TabsList>
 
               {/* Desktop Tab */}
@@ -677,6 +751,16 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
                       }}
                       onClick={handleCanvasClick}
                     >
+                      {/* Background image as img element for debugging */}
+                      {backgroundImage && (
+                        <img
+                          src={backgroundImage}
+                          alt="Background"
+                          className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                          onError={(e) => console.error('Background image failed to load:', backgroundImage)}
+                          onLoad={() => console.log('Background image loaded successfully:', backgroundImage)}
+                        />
+                      )}
                       {/* Render Slots */}
                       {desktopSlots.map((slot) => (
                         <div
@@ -744,8 +828,8 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {availableIndices.map(indexItem => (
-                                  <SelectItem key={indexItem.value} value={indexItem.value}>
+                                {availableIndices.map((indexItem, idx) => (
+                                  <SelectItem key={selectedSlotData.id + '-' + idx} value={indexItem.value}>
                                     {indexItem.label}
                                   </SelectItem>
                                 ))}
@@ -836,6 +920,16 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
                       }}
                       onClick={handleCanvasClick}
                     >
+                      {/* Background image as img element for debugging */}
+                      {backgroundImage && (
+                        <img
+                          src={backgroundImage}
+                          alt="Background"
+                          className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                          onError={(e) => console.error('Mobile background image failed to load:', backgroundImage)}
+                          onLoad={() => console.log('Mobile background image loaded successfully:', backgroundImage)}
+                        />
+                      )}
                       {/* Render Mobile Slots */}
                       {mobileSlots.map((slot) => (
                         <div
@@ -925,8 +1019,8 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {availableIndices.map(indexItem => (
-                                  <SelectItem key={indexItem.value} value={indexItem.value}>
+                                {availableIndices.map((indexItem, i) => (
+                                  <SelectItem key={(selectedSlotData?.id || 'slot') + '-' + indexItem.value + '-' + i} value={indexItem.value}>
                                     {indexItem.label}
                                   </SelectItem>
                                 ))}
@@ -1086,6 +1180,115 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
                       onChange={handleIconUpload}
                       className="hidden"
                     />
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* Variants Tab */}
+              <TabsContent value="variants" className="flex-1 overflow-hidden">
+                <div className="h-full p-4">
+                  <div className="mb-4">
+                    <h3 className="text-lg font-semibold mb-2">Настройки за варианти</h3>
+                    <p className="text-sm text-gray-600">
+                      Конфигурирайте настройките за всеки вариант на играта (възрастова група).
+                    </p>
+                  </div>
+
+                  <div className="space-y-6">
+                    {availableVariants.map((variant) => (
+                      <div key={variant.id} className="border rounded-lg p-4 bg-gray-50">
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <h4 className="font-semibold text-base">{variant.displayName}</h4>
+                            <p className="text-sm text-gray-600">{variant.description}</p>
+                            <p className="text-xs text-gray-500 mt-1">ID: {variant.id}</p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {/* Min Cells */}
+                          <div>
+                            <Label className="text-sm font-medium">Мин. клетки</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              max="20"
+                              className="h-10 mt-1"
+                              value={variantSettings[variant.id]?.minCells ?? 1}
+                              onChange={(e) => {
+                                const value = parseInt(e.target.value) || 1;
+                                setVariantSettings(prev => ({
+                                  ...prev,
+                                  [variant.id]: {
+                                    ...prev[variant.id],
+                                    minCells: value,
+                                    maxCells: Math.max(value, prev[variant.id]?.maxCells ?? value + 2)
+                                  }
+                                }));
+                              }}
+                            />
+                          </div>
+
+                          {/* Max Cells */}
+                          <div>
+                            <Label className="text-sm font-medium">Макс. клетки</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              max="20"
+                              className="h-10 mt-1"
+                              value={variantSettings[variant.id]?.maxCells ?? (desktopSlots.length + 2)}
+                              onChange={(e) => {
+                                const value = parseInt(e.target.value) || 1;
+                                setVariantSettings(prev => ({
+                                  ...prev,
+                                  [variant.id]: {
+                                    ...prev[variant.id],
+                                    maxCells: value,
+                                    minCells: Math.min(value, prev[variant.id]?.minCells ?? 1)
+                                  }
+                                }));
+                              }}
+                            />
+                          </div>
+
+                          {/* Has Extra Items */}
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`extra-items-${variant.id}`}
+                              checked={variantSettings[variant.id]?.hasExtraItems ?? false}
+                              onCheckedChange={(checked) => {
+                                setVariantSettings(prev => ({
+                                  ...prev,
+                                  [variant.id]: {
+                                    ...prev[variant.id],
+                                    hasExtraItems: checked as boolean
+                                  }
+                                }));
+                              }}
+                            />
+                            <Label htmlFor={`extra-items-${variant.id}`} className="text-sm font-medium">
+                              +2 допълнителни елемента
+                            </Label>
+                          </div>
+                        </div>
+
+                        {/* Preview */}
+                        <div className="mt-3 p-3 bg-white rounded border">
+                          <p className="text-xs text-gray-600 mb-2">Преглед на настройките:</p>
+                          <div className="flex items-center gap-4 text-sm">
+                            <span>Клетки: {variantSettings[variant.id]?.minCells ?? 1} - {variantSettings[variant.id]?.maxCells ?? (desktopSlots.length + 2)}</span>
+                            <span>Допълнителни елементи: {variantSettings[variant.id]?.hasExtraItems ? 'Да (+2)' : 'Не'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    {availableVariants.length === 0 && (
+                      <div className="text-center text-gray-500 py-8">
+                        <p>Няма налични варианти. Моля, първо създайте варианти в системата.</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </TabsContent>
