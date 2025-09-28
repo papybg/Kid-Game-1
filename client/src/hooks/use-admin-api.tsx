@@ -37,8 +37,10 @@ export interface CreateItemData {
   audio?: File; // Добавяме звук към CreateItemData
 }
 
-// API база URL - използваме основния сървър на порт 3005
-const API_BASE = "http://localhost:3005/api/admin";
+import apiPath from '../lib/config';
+
+// API база URL - използвай helper, който може да бъде конфигуриран чрез VITE_API_URL
+const API_BASE = apiPath('/api/admin');
 
 // GET всички items
 export const useAdminItems = () => {
@@ -73,7 +75,7 @@ export const useAdminPortals = () => {
   return useQuery({
     queryKey: ["admin-portals"],
     queryFn: async (): Promise<Portal[]> => {
-      const response = await fetch("http://localhost:3005/api/portals");
+  const response = await fetch(apiPath('/api/portals'));
       if (!response.ok) {
         throw new Error("Failed to fetch portals");
       }

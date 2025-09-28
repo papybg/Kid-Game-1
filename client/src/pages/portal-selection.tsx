@@ -1,4 +1,5 @@
 import { Button } from "../components/ui/button";
+import apiPath from '../lib/config';
 import { ArrowLeft, Moon, Sun, Star, PuzzleIcon } from "lucide-react";
 import { useTheme } from "../components/theme-provider";
 import { useQuery } from "@tanstack/react-query";
@@ -16,7 +17,7 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
   const { data: portals = [], isLoading, error } = useQuery<Portal[]>({
     queryKey: ['portals'],
     queryFn: async () => {
-      const response = await fetch('http://localhost:3005/api/portals');
+  const response = await fetch(apiPath('/api/portals'));
       if (!response.ok) {
         throw new Error('Failed to fetch portals');
       }

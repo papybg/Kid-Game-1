@@ -10,7 +10,8 @@
     "build": "npm install --include=dev && esbuild server/index.ts --platform=node",
     "start": "NODE_ENV=production node dist/index.js",
     "db:push": "drizzle-kit push",
-    "db:seed": "tsx seed.ts"
+    "db:seed": "tsx seed.ts",
+    "check:layout": "tsx check-layout.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",

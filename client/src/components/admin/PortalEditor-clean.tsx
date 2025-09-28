@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import apiPath from '../../lib/config';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -275,7 +276,7 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
           variantSettings: variantSettings
         };
 
-        const portalUpdateResponse = await fetch(`http://localhost:3005/api/portals/${portalId}`, {
+  const portalUpdateResponse = await fetch(apiPath(`/api/portals/${portalId}`), {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -291,7 +292,7 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
       } else {
         // Creating new portal - generate IDs
         // Get existing portals to find next available ID
-        const portalsResponse = await fetch('http://localhost:3005/api/portals');
+  const portalsResponse = await fetch(apiPath('/api/portals'));
         let existingPortals: string[] = ['d1']; // Default
 
         if (portalsResponse.ok) {
@@ -325,7 +326,7 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
 
         console.log('Creating new portal:', portalData);
 
-        const portalResponse = await fetch('http://localhost:3005/api/portals', {
+  const portalResponse = await fetch(apiPath('/api/portals'), {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -355,7 +356,7 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
       console.log('Saving layout data:', layoutData);
 
       // Save layout (create if new, update if existing)
-      const layoutResponse = await fetch(`http://localhost:3005/api/layouts/${layoutId}`, {
+  const layoutResponse = await fetch(apiPath(`/api/layouts/${layoutId}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -398,7 +399,7 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
         console.log(`Attempting to load data for portal: ${portalId}`);
         
         // Load both portal and layout data in one request
-        const response = await fetch(`http://localhost:3005/api/portals/${portalId}/full`);
+  const response = await fetch(apiPath(`/api/portals/${portalId}/full`));
         
         if (response.ok) {
           const data = await response.json();
@@ -491,7 +492,7 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
     // Load categories/indices from database
     const loadCategories = async () => {
       try {
-        const response = await fetch('http://localhost:3005/api/admin/categories');
+  const response = await fetch(apiPath('/api/admin/categories'));
         if (response.ok) {
           const categories = await response.json();
           const indices = categories.map((cat: any) => ({
@@ -511,7 +512,7 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
     // Load available variants
     const loadVariants = async () => {
       try {
-        const response = await fetch('http://localhost:3005/api/game-variants');
+  const response = await fetch(apiPath('/api/game-variants'));
         if (response.ok) {
           const variants = await response.json();
           setAvailableVariants(variants);
@@ -581,7 +582,7 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
       formData.append('portalId', portalId || 'd1');
 
       // Upload to server
-      const response = await fetch('http://localhost:3005/api/upload/background', {
+  const response = await fetch(apiPath('/api/upload/background'), {
         method: 'POST',
         body: formData
       });

@@ -29,7 +29,7 @@ export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameP
   const choiceZoneRef = useRef<HTMLDivElement>(null);
   const [choiceZoneHeight, setChoiceZoneHeight] = useState(131);
   
-  const { soundEnabled, setSoundEnabled, playSound, playVoice, playAnimalSound, isAudioPlaying, getSoundFile } = useAudioContext();
+  const { soundEnabled, setSoundEnabled, playSound, playVoice, playItemSound, isAudioPlaying, getSoundFile } = useAudioContext();
   const { gameMode } = useSettingsStore();
   
   const { data: gameSession, isLoading: sessionLoading, error: sessionError } = useQuery({
@@ -47,6 +47,9 @@ export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameP
     pauseGame,
     isGameComplete,
     removeCurrentSlot,
+    removeFromChoiceItems,
+    placeItemInSlot,
+    completeSlot,
   } = useGameState({ cells: gameSession?.cells, items: gameSession?.items });
 
   useEffect(() => {
@@ -105,24 +108,37 @@ export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameP
       setAnimatingItem({ item: itemToPlace, targetPosition: { top: parseInt(targetSlot.position.top), left: parseInt(targetSlot.position.left) } });
       setIsAnimationInProgress(true);
 
+      // За winning move - премахваме елемента от choiceItems и го поставяме в клетката веднага
+      if (isWinningMove) {
+        const slotId = `${targetSlot.position.top}-${targetSlot.position.left}`;
+        removeFromChoiceItems(itemToPlace.id);
+        placeItemInSlot(itemToPlace, slotId);
+      }
+
       setTimeout(() => {
-        setDisappearingItems(prev => new Set(prev).add(itemToPlace.id));
         setAnimatingItem(null);
         setIsAnimationInProgress(false);
 
           if (isWinningMove) {
             playSound('bell');
-            const finalAnimalSound = playAnimalSound(itemToPlace, 0); // Без delay за winning move
+            const finalAnimalSound = playItemSound(itemToPlace, 0); // Без delay за winning move
             if (finalAnimalSound) {
-              finalAnimalSound.onended = () => makeChoice(itemToPlace, targetSlot, isSimpleMode);
+              finalAnimalSound.onended = () => {
+                // Само проверяваме за победа - елементът вече е поставен
+                const slotId = `${targetSlot.position.top}-${targetSlot.position.left}`;
+                completeSlot(slotId);
+              };
             } else {
-              setTimeout(() => makeChoice(itemToPlace, targetSlot, isSimpleMode), 1000);
+              setTimeout(() => {
+                const slotId = `${targetSlot.position.top}-${targetSlot.position.left}`;
+                completeSlot(slotId);
+              }, 1000);
             }
           } else {
             const isValid = makeChoice(itemToPlace, targetSlot, isSimpleMode);
             if (isValid) {
               playSound('bell');
-              playAnimalSound(itemToPlace, 1000);
+              playItemSound(itemToPlace, 1000);
             }
           }        if (isSimpleMode) setSelectedItem(null);
       }, 1000);
@@ -194,7 +210,7 @@ export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameP
         {gameSession && gameSession.cells.map((slot: Slot) => {
             const slotId = `${slot.position.top}-${slot.position.left}`;
             const placedItem = gameState.placedItems[slotId];
-            const isActive = gameMode === 'advanced' && !isGameComplete && activeSlot && `${activeSlot.position.top}-${activeSlot.position.left}` === slotId;
+            const isActive = gameMode === 'advanced' && !isGameComplete && activeSlot && `${activeSlot.position.top}-${activeSlot.position.left}` === slotId ? true : false;
             const shouldShow = gameMode === 'simple' || isGameComplete || !!placedItem || isActive;
             if (!shouldShow) return null;
             return <GameSlotComponent key={slotId} slot={slot} isCompleted={!!placedItem} placedItem={placedItem} isActive={isActive} className="pointer-events-auto" />;
@@ -230,7 +246,7 @@ export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameP
             <div className="bg-black/10 backdrop-blur-sm rounded-2xl p-4">
               <div ref={choiceZoneRef} className="choice-zone flex gap-3 overflow-x-auto pb-2" style={{ height: `${choiceZoneHeight}px` }}>
                 {gameState.choiceItems.map((item) => (
-                  <ChoiceItem key={item.id} item={item} isUsed={gameState.usedItems.includes(item.id)} isDisabled={isAudioPlaying} shouldDisappear={disappearingItems.has(item.id)} isSelected={selectedItem?.id === item.id} isAnimating={animatingItem?.item.id === item.id} targetPosition={animatingItem?.item.id === item.id ? animatingItem.targetPosition : undefined} onClick={handleChoiceClick} />
+                  <ChoiceItem key={item.id} item={item} isUsed={gameState.usedItems.includes(item.id)} isDisabled={isAudioPlaying} isSelected={selectedItem?.id === item.id} isAnimating={animatingItem?.item.id === item.id} targetPosition={animatingItem?.item.id === item.id ? animatingItem.targetPosition : undefined} onClick={handleChoiceClick} />
                 ))}
               </div>
             </div>

@@ -2,6 +2,7 @@ import { Button } from "../components/ui/button";
 import { useQuery } from "@tanstack/react-query";
 import { LoadingSpinner } from "../components/ui/loading-spinner";
 import type { GameVariant } from "@shared/schema";
+import apiPath from '../lib/config';
 
 interface VariantSelectionProps {
   onSelectVariant: (variant: GameVariant) => void;
@@ -12,7 +13,7 @@ export default function VariantSelection({ onSelectVariant, onBackToWelcome }: V
   const { data: variants = [], isLoading, error } = useQuery<GameVariant[]>({
     queryKey: ['game-variants'],
     queryFn: async () => {
-      const response = await fetch('http://localhost:3005/api/game-variants');
+  const response = await fetch(apiPath('/api/game-variants'));
       if (!response.ok) {
         throw new Error('Failed to fetch game variants');
       }

@@ -1,28 +1,11 @@
 import { QueryClient, DefaultOptions, QueryFunction } from '@tanstack/react-query';
+import apiPath from './config';
 
 // This helper function builds the full URL safely
 const buildUrl = (path: string) => {
-  // Get the base URL from the environment variable. Default to an empty string if not set.
-  const baseUrl = import.meta.env.VITE_API_BASE || '';
-
-  console.log('buildUrl called with:', { path, baseUrl, env: import.meta.env.VITE_API_BASE });
-
-  // If no base URL is set, assume we're in development and use localhost
-  if (!baseUrl) {
-    const result = `http://localhost:3005/${path}`;
-    console.log('No baseUrl, using localhost:', result);
-    return result;
-  }
-
-  // Ensure baseUrl doesn't end with slash
-  const cleanBaseUrl = baseUrl.replace(/\/$/, '');
-
-  // Ensure path starts with slash
-  const cleanPath = path.startsWith('/') ? path : `/${path}`;
-
-  // Combine them safely
-  const result = `${cleanBaseUrl}${cleanPath}`;
-  console.log('Built URL:', result);
+  // Use centralized apiPath helper which respects VITE_API_URL
+  const result = apiPath('/' + path);
+  console.log('Built URL via apiPath:', result);
   return result;
 };
 

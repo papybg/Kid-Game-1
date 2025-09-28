@@ -12,55 +12,26 @@ type AudioContextType = {
   setSoundEnabled: (enabled: boolean) => void;
   setMusicEnabled: (enabled: boolean) => void;
   setEffectsEnabled: (enabled: boolean) => void;
-  playSound: (type: 'success' | 'error' | 'click' | 'start' | 'win' | 'bell') => void;
-  playVoice: (type: 'bravo' | 'tryAgain') => void;
-  playAnimalSound: (item: GameItem, delay?: number) => HTMLAudioElement | null; // Променяме да приема item
-  getSoundFile: (name: 'win' | 'bravo' | 'tryAgain') => HTMLAudioElement | null; // НОВАТА ФУНКЦИЯ
+  playSound: (type: 'success' | 'error' | 'click' | 'start' | 'bell') => void;
+  playVoice: (type: 'bravo' | 'tryAgain') => HTMLAudioElement | null;
+  playItemSound: (item: GameItem, delay?: number) => HTMLAudioElement | null;
+  getSoundFile: (name: 'win' | 'bravo' | 'tryAgain') => HTMLAudioElement | null;
   initializeAudio: () => Promise<void>;
 };
 
 const AudioContext = createContext<AudioContextType | undefined>(undefined);
 
-const AUDIO_FILES: {
-  voices: { [key: string]: string | null };
-  animals: { [key: string]: string | null };
-} = {
-  voices: {
-    bravo: '/audio/voices/bravo.wav',
-    tryAgain: '/audio/voices/try-again.wav',
-    win: '/audio/voices/win.wav', // ДОБАВЕНО: Звук за победа
-  },
-  animals: {
-    h: '/audio/animals/cat.mp3',
-    p: '/audio/animals/chicken.mp3',
-    s: '/audio/animals/crow.mp3',
-    r: '/audio/vehicles/bus.mp3',
-    i: '/audio/vehicles/train.mp3'
-  }
-};
-
-const ITEM_AUDIO_MAP: { [itemName: string]: string } = {
-  'Котка': '/audio/animals/cat.mp3',
-  'Куче': '/audio/animals/dog.mp3',
-  'Кокошка': '/audio/animals/chicken.mp3',
-  'Крава': '/audio/animals/cow.mp3',
-  'Врана': '/audio/animals/crow.mp3',
-  'Влак': '/audio/vehicles/train.mp3',
-  'Автобус': '/audio/vehicles/bus.mp3',
-  'Самолет': '/audio/vehicles/airplane.mp3',
-  'Заек': '/audio/animals/wolf.mp3',
-  'Пеперуда': '/audio/animals/monkey.mp3',
-  'Пчела': '/audio/animals/monkey.mp3',
-  'Птичка': '/audio/animals/crow.mp3',
-  'Цвете': '/audio/animals/monkey.mp3',
-  'Дърво': '/audio/animals/elephant.mp3'
+const VOICE_FILES: { [key: string]: string } = {
+  bravo: '/audio/voices/bravo.wav',
+  tryAgain: '/audio/voices/try-again.wav',
+  win: '/audio/voices/win.wav',
 };
 
 export function AudioProvider({ children }: { children: React.ReactNode }) {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   
-  const { soundEnabled, musicEnabled, setSoundEnabled: storeSetSoundEnabled } = useSettingsStore();
+  const { soundEnabled, setSoundEnabled: storeSetSoundEnabled } = useSettingsStore();
   const { initializeAudio: initAudio, playTone } = useAudio();
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -83,94 +54,63 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const playSound = (type: 'success' | 'error' | 'click' | 'start' | 'win' | 'bell') => {
-    if (!isInitialized || !soundEnabled) return;
-    
-    // Ако искаме да пуснем 'win' звук, вече ще използваме getSoundFile, за да имаме onended
-    if (type === 'win') {
-        const winSound = getSoundFile('win');
-        winSound?.play();
-        return;
-    }
-
-    const frequencies = { /* ... същите честоти ... */ };
-    // ... останалата логика за тоновете
-  };
-
-  // --- НОВА ФУНКЦИЯ ---
   const getSoundFile = (name: 'win' | 'bravo' | 'tryAgain'): HTMLAudioElement | null => {
     if (!isInitialized || !soundEnabled) return null;
-
-    const url = AUDIO_FILES.voices[name];
+    const url = VOICE_FILES[name];
+    if (!url) return null;
     
-    if (url) {
-        const audio = new Audio(url);
-        // Управляваме глобалното състояние 'isAudioPlaying'
-        audio.addEventListener('play', () => {
-            stopCurrentAudio();
-            setIsAudioPlaying(true);
-            currentAudioRef.current = audio;
-        });
-        audio.addEventListener('ended', () => {
-            setIsAudioPlaying(false);
-            currentAudioRef.current = null;
-        });
-        audio.addEventListener('error', (e) => {
-            console.error(`Sound file ${name} error:`, e);
-            setIsAudioPlaying(false);
-            currentAudioRef.current = null;
-        });
-        return audio;
-    }
-    return null;
-  }
-
-  const playVoice = (type: 'bravo' | 'tryAgain') => {
+    const audio = new Audio(url);
+    audio.addEventListener('play', () => {
+      stopCurrentAudio();
+      setIsAudioPlaying(true);
+      currentAudioRef.current = audio;
+    });
+    audio.addEventListener('ended', () => {
+      setIsAudioPlaying(false);
+      currentAudioRef.current = null;
+    });
+    audio.addEventListener('error', () => setIsAudioPlaying(false));
+    return audio;
+  };
+  
+  const playSound = (type: 'success' | 'error' | 'click' | 'start' | 'bell') => {
+    if (!isInitialized || !soundEnabled) return;
+    const frequencies = {
+      success: [440, 554, 659], error: [220, 233, 246], click: [800],
+      start: [261, 329, 392], bell: [800, 1000, 1200],
+    };
+    const freqs = frequencies[type];
+    if (freqs) freqs.forEach((freq, index) => setTimeout(() => playTone(freq, 0.2), index * 100));
+  };
+  
+  const playVoice = (type: 'bravo' | 'tryAgain'): HTMLAudioElement | null => {
     const voiceSound = getSoundFile(type);
     voiceSound?.play().catch(e => console.error(`Failed to play voice ${type}:`, e));
+    return voiceSound;
   };
 
-  const playAnimalSound = (item: GameItem, delay?: number) => {
-    if (!isInitialized || !soundEnabled) return null;
-    
-    let audio: HTMLAudioElement | null = null;
-    const playAfterDelay = () => {
-      let audioUrl = item.audio; // Use item's audio first
-      if (!audioUrl) {
-        audioUrl = ITEM_AUDIO_MAP[item.name] || AUDIO_FILES.animals[item.index as keyof typeof AUDIO_FILES.animals];
-      }
-      if (audioUrl) {
-        const sound = new Audio(audioUrl);
-        sound.volume = 0.7;
-        
-        sound.addEventListener('play', () => {
-            stopCurrentAudio();
-            setIsAudioPlaying(true);
-            currentAudioRef.current = sound;
-        });
-        sound.addEventListener('ended', () => {
-            setIsAudioPlaying(false);
-            currentAudioRef.current = null;
-        });
-        sound.addEventListener('error', () => {
-            setIsAudioPlaying(false);
-            currentAudioRef.current = null;
-        });
+  const playItemSound = (item: GameItem, delay?: number): HTMLAudioElement | null => {
+    if (!isInitialized || !soundEnabled || !item.audio) return null;
 
-        sound.play().catch(() => playTone(300, 0.3));
-        audio = sound;
-      } else {
-        playTone(300, 0.3);
-      }
+    let audio: HTMLAudioElement | null = null;
+    const play = () => {
+      const sound = new Audio(item.audio!); // Разчитаме на данните от базата
+      sound.volume = 0.7;
+      
+      sound.addEventListener('play', () => { stopCurrentAudio(); setIsAudioPlaying(true); currentAudioRef.current = sound; });
+      sound.addEventListener('ended', () => { setIsAudioPlaying(false); currentAudioRef.current = null; });
+      sound.addEventListener('error', () => { setIsAudioPlaying(false); currentAudioRef.current = null; });
+      
+      sound.play().catch(() => playTone(300, 0.3));
+      audio = sound;
     };
 
     if (delay && delay > 0) {
-      setTimeout(playAfterDelay, delay);
-      return null; // За delayed звуци не можем да върнем audio обект
+      setTimeout(play, delay);
     } else {
-      playAfterDelay();
-      return audio; // Връщаме създадения audio обект
+      play();
     }
+    return audio;
   };
 
 
@@ -179,16 +119,18 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       value={{
         isInitialized,
         soundEnabled,
-        musicEnabled,
-        effectsEnabled: true,
         isAudioPlaying,
         setSoundEnabled: storeSetSoundEnabled,
+        // Тези вече не са нужни, но ги оставяме, за да не счупим други компоненти
+        musicEnabled: false,
+        effectsEnabled: true,
         setMusicEnabled: () => {},
         setEffectsEnabled: () => {},
+        //------------------
         playSound,
         playVoice,
-        playAnimalSound,
-        getSoundFile, // ДОБАВЕНО ТУК
+        playItemSound,
+        getSoundFile,
         initializeAudio,
       }}
     >

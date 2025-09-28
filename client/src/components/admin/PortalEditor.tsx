@@ -1,992 +1,1296 @@
-import { useState } from 'react';import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useEffect } from 'react';
+import apiPath from '../../lib/config';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Checkbox } from '../ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { X, Save, Trash2, Upload } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../ui/dialog";
+interface Slot {
+  id: string;
+  position: { top: string; left: string };
+  diameter: string;
+  index: string[];
+}
 
-import { Button } from '../ui/button';import { Button } from "../ui/button";
+interface GameVariant {
+  id: string;
+  name: string;
+  displayName: string;
+  description?: string;
+}
 
-import { Input } from '../ui/input';import { Input } from "../ui/input";
+interface VariantSettings {
+  [variantId: string]: {
+    minCells: number;
+    maxCells: number;
+    hasExtraItems: boolean;
+  };
+}
 
-import { Label } from '../ui/label';import { Label } from "../ui/label";
-
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
-
-import { RadioGroup, RadioGroupItem } from '../ui/radio-group';import { X, Plus, Trash2, RefreshCw, Save, Loader2 } from "lucide-react";
-
-import { X, Save } from 'lucide-react';import { PortalAPI, type PortalData } from "../../lib/portal-api";
-
-
-
-interface PortalEditorProps {interface Slot {
-
-  portalId?: string;  id: string;
-
-  isOpen: boolean;  position: { top: string; left: string };
-
-  onClose: () => void;  diameter: string;
-
-}  index: string[];
-
+interface PortalEditorProps {
+  portalId?: string;
+  isOpen: boolean;
+  onClose: () => void;
 }
 
 export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
-
-  // Portal Settings Stateinterface Category {
-
-  const [portalName, setPortalName] = useState('');  id: string;
-
-  const [slotMode, setSlotMode] = useState<'equals_cells' | 'cells_plus_two'>('equals_cells');  name: string;
-
-    indices: string[];
-
-  // Current tab state}
-
+  const queryClient = useQueryClient();
+  // Portal Settings State
+  const [portalName, setPortalName] = useState('');
+  const [slotMode, setSlotMode] = useState<'with_cells' | 'without_cells'>('with_cells');
+  const [backgroundFileName, setBackgroundFileName] = useState('dolina-large.png');
+  const [imageSize, setImageSize] = useState({ width: 1920, height: 1080 });
+  
+  // Current tab state
   const [activeTab, setActiveTab] = useState('desktop');
+  // Icon management state
+  const [selectedIcon, setSelectedIcon] = useState<string | null>(null);
+  const [availableIcons, setAvailableIcons] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
-interface PortalEditorProps {
+  // Generated background files state
+  const [generatedFiles, setGeneratedFiles] = useState<{
+    desktop?: string;
+    mobile?: string;
+    icon?: string;
+  }>({});
 
-  const handleSave = () => {  isOpen: boolean;
+  // Variant settings state
+  const [variantSettings, setVariantSettings] = useState<VariantSettings>({});
+  const [availableVariants, setAvailableVariants] = useState<GameVariant[]>([]);
 
-    // TODO: Implement save functionality  onClose: () => void;
+  // Desktop Canvas State (single source for both desktop and mobile)
+  const [desktopSlots, setDesktopSlots] = useState<Slot[]>([]);
+  
+  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const mobileCanvasRef = useRef<HTMLDivElement>(null);
+  
+  // Mobile adaptation scale factors
+  const MOBILE_SIZE_SCALE = 0.7; // Mobile slots are 70% of desktop size
+  
+  // Auto-generate mobile slots from desktop slots
+  const mobileSlots: Slot[] = desktopSlots.map(slot => ({
+    ...slot,
+    id: slot.id.replace('desktop-slot-', 'mobile-slot-'),
+    diameter: `${parseFloat(slot.diameter) * MOBILE_SIZE_SCALE}%`
+  }));
+  
+  // Computed background image path
+  const backgroundImage = backgroundFileName ? `/images/backgrounds/${backgroundFileName}` : '';
 
-    console.log('Saving portal:', { portalName, slotMode });  portalId?: string;
+  // Available background files
+  const availableBackgrounds = [
+    { value: 'dolina-large.png', label: 'Долина (Голяма)', size: { width: 1920, height: 1080 } },
+    { value: 'dolina-small.png', label: 'Долина (Малка)', size: { width: 1280, height: 720 } }
+  ];
 
-    onClose();}
+  // Available indices for dropdown - loaded from database
+  const [availableIndices, setAvailableIndices] = useState([
+  { value: 'h', label: 'h - домашни' },
+  { value: 'p', label: 'p - селскостопански' },
+  { value: 'i', label: 'i - транспорт (влак)' },
+  { value: 'r', label: 'r - транспорт (кола)' },
+  { value: 's', label: 's - транспорт/птици' },
+  { value: 'j', label: 'j - джунгла' },
+  { value: 'l', label: 'l - джунгла (лъв)' },
+  { value: 'o', label: 'o - океан' },
+  { value: 'd', label: 'd - други' },
+  { value: 'f', label: 'f - гора' },
+  { value: 'z', label: 'z - неясна категория' },
+  { value: 'sa', label: 'sa - въздушен транспорт' },
+  { value: 'sg', label: 'sg - транспорт (самолет)' },
+  { value: 'rg', label: 'rg - транспорт (garbage)' },
+  { value: 'rp', label: 'rp - транспорт (пожарна)' }
+  ]);
 
+  // Load existing data when editing
+  useEffect(() => {
+    if (portalId === 'd1') {
+      setPortalName('Зелена долина - Ниво 1');
+      // TODO: Load existing slots from API
+    }
+  }, [portalId]);
+
+  // Slot management functions
+  const createSlot = (x: number, y: number) => {
+    if (!canvasRef.current) return;
+    
+    const rect = canvasRef.current.getBoundingClientRect();
+    const xPercent = ((x - rect.left) / rect.width * 100).toFixed(2);
+    const yPercent = ((y - rect.top) / rect.height * 100).toFixed(2);
+    
+    const newSlot: Slot = {
+      id: `desktop-slot-${Date.now()}`,
+      position: { top: `${yPercent}%`, left: `${xPercent}%` },
+      diameter: '11%',
+      index: ['h']
+    };
+    
+    setDesktopSlots(prev => [...prev, newSlot]);
+    setSelectedSlot(newSlot.id);
   };
 
-function PortalEditor({ isOpen, onClose, portalId }: PortalEditorProps) {
-
-  return (  // Phase 1: Basic state management
-
-    <Dialog open={isOpen} onOpenChange={onClose}>  const [portalName, setPortalName] = useState("");
-
-      <DialogContent className="max-w-6xl h-[90vh] p-0">  const [isLoading, setIsLoading] = useState(false);
-
-        <div className="flex flex-col h-full">  const [isSaving, setIsSaving] = useState(false);
-
-          {/* Header */}  const [loadError, setLoadError] = useState<string | null>(null);
-
-          <DialogHeader className="p-6 border-b">  const [saveError, setSaveError] = useState<string | null>(null);
-
-            <div className="flex items-center justify-between">  
-
-              <DialogTitle className="text-xl">  // Phase 2: Canvas and slot management - optimized for landscape fullscreen gaming
-
-                {portalId ? `Редактиране на портал: ${portalId}` : 'Създаване на нов портал'}  const [activeTab, setActiveTab] = useState("desktop");
-
-              </DialogTitle>  const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
-
-              <div className="flex gap-2">  // Optimized canvas size for landscape fullscreen gaming (16:9 aspect ratio)
-
-                <Button onClick={handleSave} className="flex items-center gap-2">  const [canvasSize, setCanvasSize] = useState({ width: 1024, height: 576 }); // Scaled down 1920x1080 for editor
-
-                  <Save className="w-4 h-4" />  const [slots, setSlots] = useState<Slot[]>([]);
-
-                  Запази  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
-
-                </Button>  
-
-                <Button variant="ghost" size="icon" onClick={onClose}>  // Phase 3: Drag & drop state
-
-                  <X className="w-4 h-4" />  const [isDragging, setIsDragging] = useState(false);
-
-                </Button>  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-
-              </div>  
-
-            </div>  // Phase 4: Mobile canvas state
-
-          </DialogHeader>  const [mobileGridSize, setMobileGridSize] = useState({ rows: 6, cols: 4 });
-
-  const [mobileSlots, setMobileSlots] = useState<Array<{ id: string; row: number; col: number; index: string[] }>>([]);
-
-          {/* Portal Settings Section */}  const [selectedMobileSlot, setSelectedMobileSlot] = useState<string | null>(null);
-
-          <div className="p-6 border-b bg-gray-50">  
-
-            <h3 className="text-lg font-semibold mb-4">Настройки на портал</h3>  // Phase 5: Index selection state
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">  const [categories, setCategories] = useState<Category[]>([]);
-
-              {/* Portal Name */}  const [isIndexDialogOpen, setIsIndexDialogOpen] = useState(false);
-
-              <div className="space-y-2">  const [indexEditingSlot, setIndexEditingSlot] = useState<string | null>(null);
-
-                <Label htmlFor="portal-name">Име на портала</Label>  const [indexEditingType, setIndexEditingType] = useState<'desktop' | 'mobile'>('desktop');
-
-                <Input  
-
-                  id="portal-name"  // Phase 6: Icon management state
-
-                  value={portalName}  const [portalIcon, setPortalIcon] = useState("/images/portals/default.png");
-
-                  onChange={(e) => setPortalName(e.target.value)}  const [iconPreview, setIconPreview] = useState<HTMLImageElement | null>(null);
-
-                  placeholder="Въведете име на портала..."  
-
-                />  // Phase 7: Layout sync state
-
-              </div>  const [autoSync, setAutoSync] = useState(true);
-
-  const [syncStatus, setSyncStatus] = useState<'synced' | 'out-of-sync' | 'syncing'>('synced');
-
-              {/* Slot Mode */}  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
-
-              <div className="space-y-2">  
-
-                <Label>Режим на слотове</Label>  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-                <RadioGroup value={slotMode} onValueChange={(value) => setSlotMode(value as any)}>  const mobileCanvasRef = useRef<HTMLCanvasElement>(null);
-
-                  <div className="flex items-center space-x-2">
-
-                    <RadioGroupItem value="equals_cells" id="equals_cells" />  // Load background image and categories
-
-                    <Label htmlFor="equals_cells">Равен на броя клетки</Label>  useEffect(() => {
-
-                  </div>    if (isOpen) {
-
-                  <div className="flex items-center space-x-2">      const img = new Image();
-
-                    <RadioGroupItem value="cells_plus_two" id="cells_plus_two" />      img.onload = () => {
-
-                    <Label htmlFor="cells_plus_two">Клетки + 2 обекта</Label>        setBackgroundImage(img);
-
-                  </div>        // Optimized for landscape fullscreen gaming - 16:9 aspect ratio
-
-                </RadioGroup>        const maxWidth = 1024;   // Scaled down from 1920px for editor performance
-
-              </div>        const maxHeight = 576;   // Scaled down from 1080px (maintains 16:9 ratio)
-
-            </div>        const aspectRatio = img.width / img.height;
-
-          </div>        
-
-        let newWidth = maxWidth;
-
-          {/* Main Content Area */}        let newHeight = maxWidth / aspectRatio;
-
-          <div className="flex-1 p-6">        
-
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">        if (newHeight > maxHeight) {
-
-              <TabsList className="grid w-full grid-cols-3 mb-6">          newHeight = maxHeight;
-
-                <TabsTrigger value="desktop">Desktop</TabsTrigger>          newWidth = maxHeight * aspectRatio;
-
-                <TabsTrigger value="mobile">Mobile</TabsTrigger>        }
-
-                <TabsTrigger value="icon">Икони</TabsTrigger>        
-
-              </TabsList>        setCanvasSize({ width: Math.floor(newWidth), height: Math.floor(newHeight) });
-
-      };
-
-              {/* Desktop Tab */}      img.src = "/images/backgrounds/dolina-large.png";
-
-              <TabsContent value="desktop" className="h-full">      
-
-                <div className="text-center py-8 text-gray-500">      // Load categories
-
-                  <p>Desktop Canvas ще бъде имплементиран в следващата фаза...</p>      setCategories([
-
-                </div>        { id: "animals", name: "Животни", indices: ["animal1", "animal2", "animal3", "animal4"] },
-
-              </TabsContent>        { id: "vehicles", name: "Превозни средства", indices: ["vehicle1", "vehicle2", "vehicle3"] },
-
-        { id: "colors", name: "Цветове", indices: ["red", "blue", "green", "yellow"] },
-
-              {/* Mobile Tab */}        { id: "shapes", name: "Фигури", indices: ["circle", "square", "triangle"] }
-
-              <TabsContent value="mobile" className="h-full">      ]);
-
-                <div className="text-center py-8 text-gray-500">
-
-                  <p>Mobile Canvas ще бъде имплементиран в следващата фаза...</p>      // Load portal data if editing existing portal
-
-                </div>      if (portalId) {
-
-              </TabsContent>        loadPortalData();
-
-      } else {
-
-              {/* Icon Tab */}        resetToDefaults();
-
-              <TabsContent value="icon" className="h-full">      }
-
-                <div className="text-center py-8 text-gray-500">    }
-
-                  <p>Icon Gallery ще бъде имплементиран в следващата фаза...</p>  }, [isOpen, portalId]);
-
-                </div>
-
-              </TabsContent>  const loadPortalData = async () => {
-
-            </Tabs>    if (!portalId) return;
-
-          </div>    
-
-        </div>    setIsLoading(true);
-
-      </DialogContent>    setLoadError(null);
-
-    </Dialog>    
-
-  );    try {
-
-}      // Try real API first, fallback to mock for development
-      const result = await PortalAPI.loadPortal(portalId);
+  const handleBackgroundChange = (fileName: string) => {
+    setBackgroundFileName(fileName);
+    const selectedBg = availableBackgrounds.find(bg => bg.value === fileName);
+    if (selectedBg) {
+      setImageSize(selectedBg.size);
+    }
+  };
+
+  const updateSlot = (slotId: string, updates: Partial<Slot>) => {
+    // Convert mobile slot ID to desktop slot ID if necessary
+    const desktopSlotId = slotId.startsWith('mobile-slot-') 
+      ? slotId.replace('mobile-slot-', 'desktop-slot-')
+      : slotId;
+    
+    // Update desktop slots - mobile adapts automatically
+    setDesktopSlots(prev => prev.map(slot => 
+      slot.id === desktopSlotId ? { ...slot, ...updates } : slot
+    ));
+  };
+
+  const deleteSlot = (slotId: string) => {
+    // Convert mobile slot ID to desktop slot ID if necessary
+    const desktopSlotId = slotId.startsWith('mobile-slot-') 
+      ? slotId.replace('mobile-slot-', 'desktop-slot-')
+      : slotId;
+    
+    // Delete from desktop slots - mobile adapts automatically
+    setDesktopSlots(prev => prev.filter(slot => slot.id !== desktopSlotId));
+    if (selectedSlot === slotId || selectedSlot === desktopSlotId) {
+      setSelectedSlot(null);
+    }
+  };
+
+  const handleCanvasClick = (e: React.MouseEvent) => {
+    if (e.shiftKey) {
+      createSlot(e.clientX, e.clientY);
+    }
+  };
+
+  const handleSlotClick = (slotId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedSlot(slotId);
+  };
+
+  const handleSlotMouseDown = (slotId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    setSelectedSlot(slotId);
+    setIsDragging(true);
+    
+    const slot = desktopSlots.find(s => s.id === slotId);
+    if (slot && canvasRef.current) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      const slotX = (parseFloat(slot.position.left) / 100) * rect.width + rect.left;
+      const slotY = (parseFloat(slot.position.top) / 100) * rect.height + rect.top;
       
-      if (result.success && result.data) {
-        const portal = result.data;
-        setPortalName(portal.name);
-        setPortalIcon(portal.icon);
-        setSlots(portal.desktopSlots);
-        setMobileSlots(portal.mobileSlots);
-        setMobileGridSize(portal.gridSize);
-        setSyncStatus(portal.syncStatus);
-        setAutoSync(portal.autoSync);
-      } else {
-        setLoadError(result.error || 'Failed to load portal data');
-        // Fallback to defaults if loading fails
-        resetToDefaults();
-      }
-    } catch (error) {
-      console.error('Error loading portal:', error);
-      setLoadError('Network error occurred while loading portal');
-      resetToDefaults();
-    } finally {
-      setIsLoading(false);
+      setDragOffset({
+        x: e.clientX - slotX,
+        y: e.clientY - slotY
+      });
     }
   };
 
-  const resetToDefaults = () => {
-    setPortalName("");
-    setPortalIcon("/images/portals/default.png");
-    setSlots([
-      { id: "slot1", position: { top: "20%", left: "30%" }, diameter: "60px", index: ["animal1"] },
-      { id: "slot2", position: { top: "60%", left: "70%" }, diameter: "50px", index: ["vehicle1"] },
-    ]);
-    setMobileSlots([
-      { id: "mobile1", row: 2, col: 1, index: ["animal1"] },
-      { id: "mobile2", row: 4, col: 3, index: ["vehicle1"] },
-    ]);
-    setMobileGridSize({ rows: 6, cols: 4 });
-    setSyncStatus('synced');
-    setAutoSync(true);
-    setLoadError(null);
-    setSaveError(null);
-  };
-
-  // Canvas rendering effect
   useEffect(() => {
-    if (backgroundImage && canvasRef.current) {
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        // Clear canvas
-        ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
-        
-        // Draw background image
-        ctx.drawImage(backgroundImage, 0, 0, canvasSize.width, canvasSize.height);
-        
-        // Draw slots
-        slots.forEach(slot => {
-          const x = (parseFloat(slot.position.left) / 100) * canvasSize.width;
-          const y = (parseFloat(slot.position.top) / 100) * canvasSize.height;
-          const radius = parseFloat(slot.diameter) / 2;
-          
-          ctx.beginPath();
-          ctx.arc(x, y, radius, 0, 2 * Math.PI);
-          ctx.fillStyle = selectedSlot === slot.id ? 'rgba(59, 130, 246, 0.5)' : 'rgba(239, 68, 68, 0.3)';
-          ctx.fill();
-          ctx.strokeStyle = selectedSlot === slot.id ? '#3b82f6' : '#ef4444';
-          ctx.lineWidth = 2;
-          ctx.stroke();
-          
-          // Draw slot label
-          if (slot.index.length > 0) {
-            ctx.fillStyle = '#000';
-            ctx.font = '12px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(slot.index[0], x, y + 4);
-          }
-        });
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging || !selectedSlot) return;
+      
+      // Determine which canvas is active based on active tab
+      let currentCanvas = null;
+      if (activeTab === 'desktop' && canvasRef.current) {
+        currentCanvas = canvasRef.current;
+      } else if (activeTab === 'mobile' && mobileCanvasRef.current) {
+        currentCanvas = mobileCanvasRef.current;
       }
+      
+      if (!currentCanvas) return;
+      
+      const rect = currentCanvas.getBoundingClientRect();
+      const x = e.clientX - dragOffset.x - rect.left;
+      const y = e.clientY - dragOffset.y - rect.top;
+      
+      const xPercent = (x / rect.width * 100).toFixed(2);
+      const yPercent = (y / rect.height * 100).toFixed(2);
+      
+      updateSlot(selectedSlot, {
+        position: { top: `${yPercent}%`, left: `${xPercent}%` }
+      });
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
     }
-  }, [backgroundImage, slots, selectedSlot, canvasSize]);
 
-  // Mobile canvas rendering effect
-  useEffect(() => {
-    if (mobileCanvasRef.current) {
-      const canvas = mobileCanvasRef.current;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        // Clear canvas
-        ctx.clearRect(0, 0, 400, 600);
-        
-        // Draw grid background
-        ctx.fillStyle = '#f8fafc';
-        ctx.fillRect(0, 0, 400, 600);
-        
-        const cellWidth = 400 / mobileGridSize.cols;
-        const cellHeight = 600 / mobileGridSize.rows;
-        
-        // Draw grid lines
-        ctx.strokeStyle = '#e2e8f0';
-        ctx.lineWidth = 1;
-        
-        for (let i = 0; i <= mobileGridSize.cols; i++) {
-          ctx.beginPath();
-          ctx.moveTo(i * cellWidth, 0);
-          ctx.lineTo(i * cellWidth, 600);
-          ctx.stroke();
-        }
-        
-        for (let i = 0; i <= mobileGridSize.rows; i++) {
-          ctx.beginPath();
-          ctx.moveTo(0, i * cellHeight);
-          ctx.lineTo(400, i * cellHeight);
-          ctx.stroke();
-        }
-        
-        // Draw mobile slots
-        mobileSlots.forEach(slot => {
-          const x = (slot.col - 0.5) * cellWidth;
-          const y = (slot.row - 0.5) * cellHeight;
-          const radius = Math.min(cellWidth, cellHeight) * 0.3;
-          
-          ctx.beginPath();
-          ctx.arc(x, y, radius, 0, 2 * Math.PI);
-          ctx.fillStyle = selectedMobileSlot === slot.id ? 'rgba(59, 130, 246, 0.5)' : 'rgba(34, 197, 94, 0.3)';
-          ctx.fill();
-          ctx.strokeStyle = selectedMobileSlot === slot.id ? '#3b82f6' : '#22c55e';
-          ctx.lineWidth = 2;
-          ctx.stroke();
-          
-          // Draw slot label
-          if (slot.index.length > 0) {
-            ctx.fillStyle = '#000';
-            ctx.font = '10px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(slot.index[0], x, y + 3);
-          }
-        });
-      }
-    }
-  }, [mobileSlots, selectedMobileSlot, mobileGridSize]);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, selectedSlot, dragOffset]);
 
-  // Phase 7: Layout Sync Functions
-  const syncLayouts = async () => {
-    setSyncStatus('syncing');
-    
-    // Simulate sync process
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Mock sync logic - in real implementation this would:
-    // 1. Compare desktop and mobile slots
-    // 2. Sync indices between matching slots
-    // 3. Handle conflicts
-    
-    setSyncStatus('synced');
-    setLastSyncTime(new Date());
-    
-    alert(`Layout sync completed!\nDesktop slots: ${slots.length}\nMobile slots: ${mobileSlots.length}`);
-  };
+  // Computed selected slot data (works for both desktop and mobile views)
+  const selectedSlotData = selectedSlot ? 
+    desktopSlots.find(slot => slot.id === selectedSlot || slot.id === selectedSlot.replace('mobile-slot-', 'desktop-slot-')) || null 
+    : null;
 
-  const checkSyncStatus = () => {
-    // Check if layouts are out of sync
-    const desktopIndices = slots.flatMap(slot => slot.index);
-    const mobileIndices = mobileSlots.flatMap(slot => slot.index);
-    
-    const isOutOfSync = JSON.stringify(desktopIndices.sort()) !== JSON.stringify(mobileIndices.sort());
-    setSyncStatus(isOutOfSync ? 'out-of-sync' : 'synced');
-  };
-
-  // Auto sync when slots change (if enabled)
-  useEffect(() => {
-    if (autoSync && slots.length > 0 && mobileSlots.length > 0) {
-      checkSyncStatus();
-    }
-  }, [slots, mobileSlots, autoSync]);
-
-  // Handle form submission with API integration
   const handleSave = async () => {
     if (!portalName.trim()) {
-      alert("Моля въведете име на портала");
+      alert('Моля въведете име на портала');
       return;
     }
-    
+
+    if (!backgroundFileName) {
+      alert('Моля изберете фонова картина преди да запазите портала');
+      return;
+    }
+
     setIsSaving(true);
-    setSaveError(null);
-    
+
     try {
-      const portalData: PortalData = {
-        id: portalId,
-        name: portalName,
-        icon: portalIcon,
-        backgroundImage: "/images/backgrounds/dolina-large.png",
-        desktopSlots: slots,
-        mobileSlots: mobileSlots,
-        gridSize: mobileGridSize,
-        syncStatus: syncStatus,
-        autoSync: autoSync
+      let layoutId: string;
+      let portalIdToUse: string;
+
+      if (portalId) {
+        // Editing existing portal - update portal data with variant settings
+        portalIdToUse = portalId;
+        layoutId = portalId; // For existing portals, layoutId is the same as portalId
+
+        const portalUpdateData = {
+          variantSettings: variantSettings
+        };
+
+        const portalUpdateResponse = await fetch(apiPath(`/api/portals/${portalId}`), {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(portalUpdateData)
+        });
+
+        if (!portalUpdateResponse.ok) {
+          console.warn('Failed to update portal variant settings, but continuing with layout update');
+        } else {
+          console.log('Portal variant settings updated successfully');
+        }
+      } else {
+        // Creating new portal - generate IDs
+        // Get existing portals to find next available ID
+        const portalsResponse = await fetch(apiPath('/api/portals'));
+        let existingPortals: string[] = ['d1']; // Default
+
+        if (portalsResponse.ok) {
+          const portalsData = await portalsResponse.json();
+          existingPortals = portalsData.map((p: any) => p.id);
+        }
+
+        // Generate next available portal ID
+        let nextId = 2;
+        while (existingPortals.includes(`d${nextId}`)) {
+          nextId++;
+        }
+
+        portalIdToUse = `d${nextId}`;
+        layoutId = `l${Date.now()}`; // Use timestamp for layout ID
+
+        // Create new portal first
+        const portalData = {
+          id: portalIdToUse,
+          portalName: portalName.trim(),
+          fileName: backgroundFileName,
+          iconFileName: selectedIcon || backgroundFileName,
+          layouts: [layoutId],
+          cellCount: desktopSlots.length,
+          min_cells: Math.max(1, desktopSlots.length - 2),
+          max_cells: desktopSlots.length + 2,
+          item_count_rule: "equals_cells",
+          variantSettings: variantSettings,
+          isLocked: false
+        };
+
+        console.log('Creating new portal:', portalData);
+
+        const portalResponse = await fetch(apiPath('/api/portals'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(portalData)
+        });
+
+        if (!portalResponse.ok) {
+          const errorData = await portalResponse.json().catch(() => ({ message: 'Unknown error' }));
+          throw new Error(`Failed to create portal: ${errorData.message || portalResponse.status}`);
+        }
+
+        console.log('Portal created successfully');
+      }
+
+      // Prepare layout data for save/create
+      const layoutData = {
+        id: layoutId,
+        name: portalName.trim(),
+        backgroundLarge: generatedFiles.desktop ? `/images/backgrounds/${generatedFiles.desktop}` : `/images/backgrounds/${backgroundFileName}`,
+        backgroundSmall: generatedFiles.mobile ? `/images/backgrounds/${generatedFiles.mobile}` : `/images/backgrounds/${backgroundFileName}`,
+        slots_desktop: desktopSlots,
+        slots_mobile: mobileSlots,
+        ...(selectedIcon && { iconFileName: selectedIcon })
       };
 
-      // Try real API first, fallback to mock for development
-      let result;
-      try {
-        result = await PortalAPI.savePortal(portalData);
-      } catch (error) {
-        console.warn('Real API failed, using mock API:', error);
-        result = await PortalAPI.mockSavePortal(portalData);
+      console.log('Saving layout data:', layoutData);
+
+      // Save layout (create if new, update if existing)
+      const layoutResponse = await fetch(apiPath(`/api/layouts/${layoutId}`), {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(layoutData)
+      });
+
+      if (!layoutResponse.ok) {
+        const errorData = await layoutResponse.json().catch(() => ({ message: 'Unknown error' }));
+        throw new Error(`Failed to save layout: ${errorData.message || layoutResponse.status}`);
       }
 
-      if (result.success) {
-        alert(`Порталът "${portalName}" е запазен успешно!`);
-        console.log('Portal saved:', result.data);
-        onClose();
-      } else {
-        setSaveError(result.error || 'Failed to save portal');
-        alert(`Грешка при запазване: ${result.error}`);
-      }
+      const result = await layoutResponse.json();
+      console.log('Save successful:', result);
+
+      alert(`Портала е ${portalId ? 'запазен' : 'създаден'} успешно! ID: ${portalIdToUse}`);
+      
+      // Refresh portals list in admin panel
+      queryClient.invalidateQueries({ queryKey: ["admin-portals"] });
+      
+      // Also invalidate game session cache for this portal
+      queryClient.invalidateQueries({ queryKey: ["gameSession", portalIdToUse] });
+      
+      onClose();
     } catch (error) {
-      console.error('Error saving portal:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      setSaveError(errorMessage);
-      alert(`Възникна грешка: ${errorMessage}`);
+      console.error('Failed to save portal:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Неизвестна грешка';
+      alert(`Грешка при запазване на портала: ${errorMessage}`);
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Add slot functionality
-  const addSlot = () => {
-    const newSlot: Slot = {
-      id: `slot_${Date.now()}`,
-      position: { top: "50%", left: "50%" },
-      diameter: "60px",
-      index: []
+  // Load existing portal data when component mounts or portalId changes
+  useEffect(() => {
+    const loadPortalData = async () => {
+      if (!portalId || !isOpen) return;
+      
+      try {
+        console.log(`Attempting to load data for portal: ${portalId}`);
+        
+        // Load both portal and layout data in one request
+        const response = await fetch(apiPath(`/api/portals/${portalId}/full`));
+        
+        if (response.ok) {
+          const data = await response.json();
+          const { portal, layout } = data;
+          
+          console.log('Loaded portal data:', portal);
+          console.log('Loaded layout data:', layout);
+          
+          // Load portal settings from portal data
+          setPortalName(portal.portalName || '');
+          if (layout?.backgroundLarge) {
+            const fileName = layout.backgroundLarge.split('/').pop() || 'dolina-large.png';
+            setBackgroundFileName(fileName);
+          }
+          
+          // Load desktop slots
+          if (layout?.slots_desktop && Array.isArray(layout.slots_desktop)) {
+            setDesktopSlots(layout.slots_desktop);
+          }
+          
+          // Load mobile slots if available (they will be scaled from desktop slots)
+          // Mobile slots are computed from desktop slots with MOBILE_SIZE_SCALE
+          
+          console.log('Successfully loaded portal and layout data');
+        } else if (response.status === 404) {
+          // Portal doesn't exist - this is normal for new portals
+          console.log(`Portal ${portalId} not found - this is expected for new portals`);
+        } else {
+          console.error(`Failed to load portal data: ${response.status}`);
+        }
+      } catch (error) {
+        console.error('Failed to load portal data:', error);
+      }
     };
-    setSlots([...slots, newSlot]);
-    setSelectedSlot(newSlot.id);
-  };
 
-  const removeSlot = () => {
-    if (selectedSlot) {
-      setSlots(slots.filter(slot => slot.id !== selectedSlot));
+    loadPortalData();
+  }, [portalId, isOpen]);
+
+  // Reset state when opening for new portal
+  useEffect(() => {
+    if (isOpen) {
+      // Reset all state when opening the editor
+      setPortalName('');
+      setSlotMode('with_cells');
+      setBackgroundFileName('');
+      setImageSize({ width: 1920, height: 1080 });
+      setActiveTab('desktop');
+      setSelectedIcon(null);
+      setIsSaving(false);
+      setGeneratedFiles({});
+      setDesktopSlots([]);
       setSelectedSlot(null);
+      setIsDragging(false);
+      setDragOffset({ x: 0, y: 0 });
+      setVariantSettings({});
     }
-  };
+  }, [isOpen]);
 
-  const addMobileSlot = () => {
-    const newSlot = {
-      id: `mobile_${Date.now()}`,
-      row: 3,
-      col: 2,
-      index: []
+  // Load available icons
+  useEffect(() => {
+    const loadIcons = async () => {
+      try {
+        // Get icons from API or hardcoded list for now
+        const icons = [
+          '1758682345806-robin.png',
+          '1758683309594-wolf.png', 
+          '1758684157766-train1.png',
+          '1758684433340-train2.png',
+          '1758686243635-train3.png',
+          '1758686331550-dove.png',
+          '1758689691831-firetruck.png',
+          '1758693122489-balloon.png',
+          '1758750796740-lion.png',
+          'airplane.png',
+          'bus.png',
+          'cat.png',
+          'chicken.png',
+          'cow.png',
+          'crow.png',
+          'dog.png',
+          'firetruck.png',
+          'train.png'
+        ];
+        setAvailableIcons(icons);
+      } catch (error) {
+        console.error('Failed to load icons:', error);
+      }
     };
-    setMobileSlots([...mobileSlots, newSlot]);
-    setSelectedMobileSlot(newSlot.id);
-  };
 
-  const removeMobileSlot = () => {
-    if (selectedMobileSlot) {
-      setMobileSlots(mobileSlots.filter(slot => slot.id !== selectedMobileSlot));
-      setSelectedMobileSlot(null);
+    // Load categories/indices from database
+    const loadCategories = async () => {
+      try {
+        const response = await fetch(apiPath('/api/admin/categories'));
+        if (response.ok) {
+          const categories = await response.json();
+          const indices = categories.map((cat: any) => ({
+            value: cat.indexValue,
+            label: `${cat.indexValue} - ${cat.categoryName}${cat.description ? ` (${cat.description})` : ''}`
+          }));
+          setAvailableIndices(indices);
+          console.log('Loaded categories from database:', indices);
+        } else {
+          console.log('Failed to load categories, using fallback');
+        }
+      } catch (error) {
+        console.error('Failed to load categories:', error);
+      }
+    };
+
+    // Load available variants
+    const loadVariants = async () => {
+      try {
+        const response = await fetch(apiPath('/api/game-variants'));
+        if (response.ok) {
+          const variants = await response.json();
+          setAvailableVariants(variants);
+          console.log('Loaded variants:', variants);
+        } else {
+          console.log('Failed to load variants');
+        }
+      } catch (error) {
+        console.error('Failed to load variants:', error);
+      }
+    };
+
+    if (isOpen) {
+      loadIcons();
+      loadCategories();
+      loadVariants();
     }
+  }, [isOpen]);
+
+  const handleIconSelect = (iconFileName: string) => {
+    setSelectedIcon(iconFileName);
   };
 
-  // Handle dialog close
-  const handleClose = () => {
-    if (portalName && !confirm("Имате незапазени промени. Сигурни ли сте, че искате да затворите?")) {
+  const handleIconUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      alert('Моля изберете изображение файл (PNG, JPG)');
       return;
     }
-    onClose();
+
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Файлът е твърде голям. Максимален размер: 5MB');
+      return;
+    }
+
+    console.log('Uploading icon:', file.name);
+    // TODO: Implement actual upload to server
+    alert(`Upload на "${file.name}" ще бъде имплементиран в следващата фаза.`);
+  };
+
+  const handleBackgroundUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      alert('Моля изберете изображение файл (PNG, JPG)');
+      return;
+    }
+
+    // Check file size (max 10MB for backgrounds)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Файлът е твърде голям. Максимален размер: 10MB');
+      return;
+    }
+
+    try {
+      console.log('Uploading background:', file.name);
+
+      // Create FormData for upload
+      const formData = new FormData();
+      formData.append('background', file);
+      formData.append('portalId', portalId || 'd1');
+
+      // Upload to server
+      const response = await fetch(apiPath('/api/upload/background'), {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Upload successful:', result);
+
+      // Update state with new filenames
+      setBackgroundFileName(result.desktop);
+      setImageSize(result.size || { width: 1920, height: 1080 });
+
+      // Store generated files for display in tabs
+      setGeneratedFiles({
+        desktop: result.desktop,
+        mobile: result.mobile,
+        icon: result.icon
+      });
+
+      console.log('Background image set to:', `/images/backgrounds/${result.desktop}`);
+
+      alert(`Фонът е качен успешно! Създадени са файлове:\n- Desktop: ${result.desktop}\n- Mobile: ${result.mobile}\n- Icon: ${result.icon}`);
+
+    } catch (error) {
+      console.error('Failed to upload background:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Неизвестна грешка';
+      alert(`Грешка при качване на фона: ${errorMessage}`);
+    } finally {
+      // Clear the input only after processing is complete
+      (event.target as HTMLInputElement).value = '';
+    }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={() => handleClose()}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader className="flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-xl font-bold">
-              {portalId ? "Редактирай портал" : "Създай нов портал"}
-            </DialogTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleClose}
-              className="h-6 w-6 p-0"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          <DialogDescription className="text-sm text-gray-600">
-            {portalId 
-              ? "Редактирайте съществуващия портал с неговите настройки и layout."
-              : "Създайте нов портал като конфигурирате layout-а за desktop и mobile устройства."
-            }
-          </DialogDescription>
-        </DialogHeader>
-
-        {/* Main Content Area */}
-        <div className="flex-1 overflow-y-auto">
-          {isLoading ? (
-            <div className="flex items-center justify-center h-96">
-              <div className="text-center">
-                <Loader2 className="w-8 h-8 animate-spin mx-auto mb-3 text-blue-500" />
-                <p className="text-gray-600">Зареждане на портал данни...</p>
-              </div>
-            </div>
-          ) : loadError ? (
-            <div className="flex items-center justify-center h-96">
-              <div className="text-center max-w-md">
-                <div className="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
-                  <X className="w-8 h-8 text-red-500" />
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Грешка при зареждане</h3>
-                <p className="text-gray-600 mb-4">{loadError}</p>
-                <Button onClick={() => portalId ? loadPortalData() : resetToDefaults()}>
-                  Опитай отново
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-[98vw] max-h-[98vh] h-[98vh] p-0 overflow-hidden">
+        <div className="flex flex-col h-full">
+          {/* Header */}
+          <DialogHeader className="p-4 border-b">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-xl">
+                {portalId ? `Редактиране на портал: ${portalId}` : 'Създаване на нов портал'}
+              </DialogTitle>
+              <DialogDescription className="sr-only">
+                {portalId ? `Редактирайте настройките на портал ${portalId}` : 'Създайте нов портал с фонова картина, slots и настройки'}
+              </DialogDescription>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={handleSave} 
+                  disabled={isSaving}
+                  className="flex items-center gap-2 h-8"
+                >
+                  <Save className="w-4 h-4" />
+                  {isSaving ? 'Запазва...' : 'Запази'}
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
+                  <X className="w-4 h-4" />
                 </Button>
               </div>
             </div>
-          ) : (
-            <div className="p-6 space-y-6">
-            
-            {/* Phase 1: Basic Portal Information */}
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-800">Основна информация</h3>
-              
+          </DialogHeader>
+
+          {/* Portal Settings Section */}
+          <div className="p-3 border-b bg-gray-50">
+            <h3 className="text-lg font-semibold mb-3">Настройки на портал</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Portal Name */}
               <div className="space-y-2">
-                <Label htmlFor="portalName" className="text-sm font-medium">
-                  Име на портала *
-                </Label>
+                <Label htmlFor="portal-name" className="text-sm">Име на портала</Label>
                 <Input
-                  id="portalName"
+                  id="portal-name"
+                  className="h-8"
                   value={portalName}
                   onChange={(e) => setPortalName(e.target.value)}
                   placeholder="Въведете име на портала..."
-                  className="w-full"
                 />
               </div>
-            </div>
 
-            {/* Phase 2-7: Portal Editor Tabs */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-800">Редактор на портал</h3>
-                
-                {/* Phase 7: Sync Status Indicator */}
-                <div className="flex items-center gap-2 text-xs">
-                  <div className={`w-2 h-2 rounded-full ${
-                    syncStatus === 'synced' ? 'bg-green-500' :
-                    syncStatus === 'out-of-sync' ? 'bg-yellow-500' :
-                    'bg-blue-500 animate-pulse'
-                  }`}></div>
-                  <span className="text-gray-600">
-                    {syncStatus === 'synced' ? 'Layouts Synced' :
-                     syncStatus === 'out-of-sync' ? 'Out of Sync' :
-                     'Syncing...'}
-                  </span>
-                  {lastSyncTime && (
-                    <span className="text-gray-400">
-                      | {lastSyncTime.toLocaleTimeString()}
-                    </span>
-                  )}
+              {/* Background File */}
+              <div className="space-y-2">
+                <Label className="text-sm">Фонова картина</Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={backgroundFileName}
+                    readOnly
+                    placeholder="Няма избран файл - моля качете нов"
+                    className="h-8 flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => document.getElementById('background-upload')?.click()}
+                    className="h-8 px-3"
+                  >
+                    <Upload className="w-4 h-4 mr-1" />
+                    Upload
+                  </Button>
+                </div>
+                <input
+                  id="background-upload"
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg"
+                  onChange={handleBackgroundUpload}
+                  className="hidden"
+                />
+              </div>
+
+              {/* Image Size Display */}
+              <div className="space-y-2">
+                <Label className="text-sm">Размер (пиксели)</Label>
+                <div className="h-8 px-3 py-1 border rounded-md bg-white text-sm flex items-center text-gray-600">
+                  {imageSize.width} × {imageSize.height}
                 </div>
               </div>
-              
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="desktop">Desktop Layout</TabsTrigger>
-                  <TabsTrigger value="mobile">Mobile Layout</TabsTrigger>
-                  <TabsTrigger value="icons">Icons</TabsTrigger>
-                </TabsList>
 
-                <TabsContent value="desktop" className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h4 className="text-lg font-medium">Desktop Canvas</h4>
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={addSlot}>
-                        <Plus className="w-4 h-4 mr-1" />
-                        Add Slot
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="destructive"
-                        onClick={removeSlot}
-                        disabled={!selectedSlot}
-                      >
-                        <Trash2 className="w-4 h-4 mr-1" />
-                        Remove
-                      </Button>
-                    </div>
+              {/* Slot Mode */}
+              <div className="space-y-2">
+                <Label className="text-sm">Режим на фона</Label>
+                <RadioGroup value={slotMode} onValueChange={(value) => setSlotMode(value as any)} className="space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="with_cells" id="with_cells" />
+                    <Label htmlFor="with_cells" className="text-xs">С клетки</Label>
                   </div>
-                  
-                  {/* Background Image Requirements Info */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <div className="flex items-start gap-2">
-                      <div className="text-blue-600 mt-0.5">📐</div>
-                      <div className="text-sm">
-                        <div className="font-medium text-blue-800 mb-1">Препоръки за фоново изображение:</div>
-                        <div className="text-blue-700 space-y-1">
-                          <div>• <strong>Оптимален размер:</strong> 1920×1080px (16:9 ratio)</div>
-                          <div>• <strong>Формат:</strong> PNG за най-добро качество</div>
-                          <div>• <strong>Файлов размер:</strong> 300-800KB препоръчан</div>
-                          <div>• <strong>Дизайн:</strong> Landscape пълен екран за мобилни и desktop</div>
-                        </div>
-                      </div>
-                    </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="without_cells" id="without_cells" />
+                    <Label htmlFor="without_cells" className="text-xs">Без клетки</Label>
                   </div>
-                  
-                  <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-                    {/* Canvas Container */}
-                    <div className="lg:col-span-3 bg-white rounded-lg border-2 border-dashed border-gray-300 p-4">
-                      <canvas
-                        ref={canvasRef}
-                        width={canvasSize.width}
-                        height={canvasSize.height}
-                        className="border border-gray-200 rounded cursor-pointer"
-                        style={{ maxWidth: '100%', height: 'auto' }}
-                        onClick={(e) => {
-                          const rect = canvasRef.current?.getBoundingClientRect();
-                          if (rect) {
-                            const scaleX = canvasSize.width / rect.width;
-                            const scaleY = canvasSize.height / rect.height;
-                            const x = (e.clientX - rect.left) * scaleX;
-                            const y = (e.clientY - rect.top) * scaleY;
-                            
-                            // Check if clicked on a slot
-                            let clickedSlot = null;
-                            slots.forEach(slot => {
-                              const slotX = (parseFloat(slot.position.left) / 100) * canvasSize.width;
-                              const slotY = (parseFloat(slot.position.top) / 100) * canvasSize.height;
-                              const radius = parseFloat(slot.diameter) / 2;
-                              
-                              if (Math.sqrt((x - slotX) ** 2 + (y - slotY) ** 2) <= radius) {
-                                clickedSlot = slot.id;
-                              }
-                            });
-                            
-                            setSelectedSlot(clickedSlot);
-                            console.log('Canvas click:', { x, y, clickedSlot });
-                          }
-                        }}
-                      />
-                    </div>
-
-                    {/* Properties Panel */}
-                    <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                      <h5 className="font-medium text-gray-800">Slot Properties</h5>
-                      <div className="text-center text-gray-400 py-4">
-                        <div className="w-12 h-12 mx-auto mb-2 bg-gray-200 rounded-full flex items-center justify-center">
-                          🎯
-                        </div>
-                        <p className="text-xs">Select a slot to edit properties</p>
-                        <p className="text-xs mt-2">Phase 3-5 functionality</p>
-                      </div>
-
-                      {/* Layout Synchronization moved here */}
-                      <div className="border-t pt-4">
-                        <h6 className="font-medium text-xs mb-3 text-gray-700">Layout Synchronization</h6>
-                        <div className="bg-blue-50 rounded-lg p-3 space-y-3">
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <p className="text-xs font-medium text-blue-900">Auto Sync Layouts</p>
-                              <Button 
-                                size="sm" 
-                                variant="outline"
-                                className="h-6 text-xs px-2"
-                                onClick={() => setAutoSync(!autoSync)}
-                              >
-                                {autoSync ? 'ON' : 'OFF'}
-                              </Button>
-                            </div>
-                            <p className="text-xs text-blue-700">Auto sync indices between desktop and mobile</p>
-                          </div>
-                          
-                          <div className="flex gap-2">
-                            <Button 
-                              size="sm" 
-                              className="flex-1 h-7 text-xs"
-                              onClick={syncLayouts}
-                              disabled={syncStatus === 'syncing'}
-                            >
-                              <RefreshCw className={`w-3 h-3 mr-1 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
-                              Sync Now
-                            </Button>
-                          </div>
-                          
-                          <div className="text-xs text-blue-600 pt-1 border-t border-blue-100">
-                            <div className="flex items-center gap-1 mb-1">
-                              <div className={`w-1.5 h-1.5 rounded-full ${
-                                syncStatus === 'synced' ? 'bg-green-500' :
-                                syncStatus === 'out-of-sync' ? 'bg-yellow-500' :
-                                'bg-blue-500 animate-pulse'
-                              }`}></div>
-                              <span className="font-medium capitalize">{syncStatus === 'synced' ? 'Synced' : syncStatus === 'out-of-sync' ? 'Out of Sync' : 'Syncing...'}</span>
-                            </div>
-                            <div>Desktop: {slots.length} slots ↔ Mobile: {mobileSlots.length} slots</div>
-                            {lastSyncTime && (
-                              <div>Last sync: {lastSyncTime.toLocaleTimeString()}</div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="mobile" className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h4 className="text-lg font-medium">Mobile Grid Layout</h4>
-                    <div className="flex gap-2">
-                      <Button size="sm" onClick={addMobileSlot}>
-                        <Plus className="w-4 h-4 mr-1" />
-                        Add Slot
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="destructive"
-                        onClick={removeMobileSlot}
-                        disabled={!selectedMobileSlot}
-                      >
-                        <Trash2 className="w-4 h-4 mr-1" />
-                        Remove
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-                    {/* Mobile Canvas Container */}
-                    <div className="lg:col-span-3 bg-white rounded-lg border-2 border-dashed border-gray-300 p-4">
-                      <canvas
-                        ref={mobileCanvasRef}
-                        width={400}
-                        height={600}
-                        className="border border-gray-200 rounded cursor-pointer mx-auto"
-                        onClick={(e) => {
-                          const rect = mobileCanvasRef.current?.getBoundingClientRect();
-                          if (rect) {
-                            const x = e.clientX - rect.left;
-                            const y = e.clientY - rect.top;
-                            
-                            const cellWidth = 400 / mobileGridSize.cols;
-                            const cellHeight = 600 / mobileGridSize.rows;
-                            
-                            // Check if clicked on a mobile slot
-                            let clickedSlot = null;
-                            mobileSlots.forEach(slot => {
-                              const slotX = (slot.col - 0.5) * cellWidth;
-                              const slotY = (slot.row - 0.5) * cellHeight;
-                              const radius = Math.min(cellWidth, cellHeight) * 0.3;
-                              
-                              if (Math.sqrt((x - slotX) ** 2 + (y - slotY) ** 2) <= radius) {
-                                clickedSlot = slot.id;
-                              }
-                            });
-                            
-                            setSelectedMobileSlot(clickedSlot);
-                            console.log('Mobile canvas click:', { x, y, clickedSlot });
-                          }
-                        }}
-                      />
-                    </div>
-
-                    {/* Mobile Properties Panel */}
-                    <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-                      <h5 className="font-medium text-gray-800">Mobile Slot Properties</h5>
-                      
-                      <div className="text-center text-gray-400 py-4">
-                        <div className="w-12 h-12 mx-auto mb-2 bg-gray-200 rounded-full flex items-center justify-center">
-                          📱
-                        </div>
-                        <p className="text-xs">Select a mobile slot to edit</p>
-                        <p className="text-xs mt-1">Phase 4-5 functionality</p>
-                      </div>
-
-                      {/* Grid Size Controls Preview */}
-                      <div className="border-t pt-3 space-y-3">
-                        <h6 className="text-xs font-medium text-gray-600">Grid Settings</h6>
-                        
-                        <div className="space-y-2">
-                          <Label className="text-xs font-medium text-gray-600">
-                            Rows: {mobileGridSize.rows}
-                          </Label>
-                          <div className="w-full h-2 bg-gray-200 rounded-lg">
-                            <div className="w-3/5 h-2 bg-blue-500 rounded-lg"></div>
-                          </div>
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label className="text-xs font-medium text-gray-600">
-                            Columns: {mobileGridSize.cols}
-                          </Label>
-                          <div className="w-full h-2 bg-gray-200 rounded-lg">
-                            <div className="w-2/3 h-2 bg-blue-500 rounded-lg"></div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="icons" className="space-y-4">
-                  <div className="space-y-6">
-                    <div>
-                      <h4 className="text-lg font-medium mb-4">Portal Icon Management</h4>
-                      
-                      {/* Current Icon Display */}
-                      <div className="space-y-4">
-                        <div>
-                          <Label className="text-sm font-medium text-gray-600">Current Portal Icon</Label>
-                          <p className="text-xs text-gray-500 mt-1">Choose an icon for your portal</p>
-                        </div>
-                        
-                        {/* Icon Preview */}
-                        <div className="flex items-center gap-4">
-                          <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300">
-                            <div className="text-gray-400 text-2xl">🎯</div>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium">Current Icon</p>
-                            <p className="text-xs text-gray-500">{portalIcon}</p>
-                          </div>
-                        </div>
-                        
-                        {/* Icon Selection Grid */}
-                        <div className="space-y-4">
-                          <Label className="text-sm font-medium text-gray-600">Available Icons</Label>
-                          <div className="grid grid-cols-5 gap-3">
-                            {[
-                              { name: 'Долина', icon: '🎯', path: '/images/portals/dolina.png' },
-                              { name: 'Градина', icon: '🌸', path: '/images/portals/gradina.png' },
-                              { name: 'Море', icon: '🌊', path: '/images/portals/more.png' },
-                              { name: 'Гора', icon: '🌲', path: '/images/portals/gora.png' },
-                              { name: 'По подразбиране', icon: '⭕', path: '/images/portals/default.png' }
-                            ].map(option => (
-                              <Button
-                                key={option.name}
-                                variant={portalIcon === option.path ? "default" : "outline"}
-                                className="h-20 flex-col gap-2 p-3"
-                                onClick={() => {
-                                  setPortalIcon(option.path);
-                                  alert(`Icon selected: ${option.name}`);
-                                }}
-                              >
-                                <div className="w-8 h-8 bg-gray-200 rounded flex items-center justify-center">
-                                  {option.icon}
-                                </div>
-                                <span className="text-xs text-center">{option.name}</span>
-                              </Button>
-                            ))}
-                          </div>
-                        </div>
-                        
-                        {/* Icon Upload Section */}
-                        <div className="border-t pt-4">
-                          <Label className="text-sm font-medium text-gray-600">Custom Icon Upload</Label>
-                          <p className="text-xs text-gray-500 mt-1 mb-3">Upload your own icon (recommended: 64x64px PNG)</p>
-                          
-                          <div className="flex items-center gap-3">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => alert('Custom icon upload - Phase 6 functionality!')}
-                            >
-                              <Plus className="w-4 h-4 mr-1" />
-                              Upload Icon
-                            </Button>
-                            
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => {
-                                setPortalIcon("/images/portals/default.png");
-                                alert('Reset to default icon');
-                              }}
-                            >
-                              Reset to Default
-                            </Button>
-                          </div>
-                        </div>
-                        
-                        {/* Icon Preview in Different Sizes */}
-                        <div className="border-t pt-4">
-                          <Label className="text-sm font-medium text-gray-600 mb-3 block">Icon Preview</Label>
-                          <div className="flex items-center gap-4">
-                            <div className="text-center">
-                              <div className="w-8 h-8 bg-gray-200 rounded flex items-center justify-center mb-1">
-                                🎯
-                              </div>
-                              <span className="text-xs text-gray-500">Small</span>
-                            </div>
-                            <div className="text-center">
-                              <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center mb-1">
-                                🎯
-                              </div>
-                              <span className="text-xs text-gray-500">Medium</span>
-                            </div>
-                            <div className="text-center">
-                              <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center mb-1">
-                                🎯
-                              </div>
-                              <span className="text-xs text-gray-500">Large</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
-              </Tabs>
-            </div>
-
-            {/* Debug Info */}
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg text-sm">
-              <h4 className="font-medium mb-2">Debug информация</h4>
-              <div className="space-y-1 text-gray-600">
-                <p><strong>Portal ID:</strong> {portalId || 'NEW'}</p>
-                <p><strong>Име:</strong> {portalName || '(празно)'}</p>
-                <p><strong>Режим:</strong> {portalId ? 'Редактиране' : 'Създаване'}</p>
-                <p><strong>Статус:</strong> Phase 8 - API Integration Complete</p>
-                <p><strong>Desktop Slots:</strong> {slots.length} | <strong>Mobile Slots:</strong> {mobileSlots.length}</p>
-                <p><strong>Sync Status:</strong> {syncStatus} | <strong>Auto Sync:</strong> {autoSync ? 'Enabled' : 'Disabled'}</p>
-                {saveError && <p><strong>Save Error:</strong> <span className="text-red-600">{saveError}</span></p>}
+                </RadioGroup>
               </div>
             </div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="px-6 py-4 border-t bg-gray-50 flex justify-between items-center flex-shrink-0">
-          <div className="text-sm text-gray-500">
-            Portal Editor v1.0 - Phase 7 Complete
           </div>
-          <div className="flex gap-3">
-            <Button variant="outline" onClick={handleClose}>
-              Отказ
-            </Button>
-            <Button 
-              onClick={handleSave} 
-              disabled={isSaving || !portalName.trim()}
-              className="flex items-center gap-2"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Запазва...
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4" />
-                  Запази портал
-                </>
-              )}
-            </Button>
+
+          {/* Main Content Area */}
+          <div className="flex-1 overflow-hidden">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+              <TabsList className="grid w-full grid-cols-4 mx-3 mt-2 mb-0">
+                <TabsTrigger value="desktop" className="text-sm">Desktop</TabsTrigger>
+                <TabsTrigger value="mobile" className="text-sm">Mobile</TabsTrigger>
+                <TabsTrigger value="icon" className="text-sm">Икони</TabsTrigger>
+                <TabsTrigger value="variants" className="text-sm">Варианти</TabsTrigger>
+              </TabsList>
+
+              {/* Desktop Tab */}
+              <TabsContent value="desktop" className="flex-1 overflow-hidden">
+                <div className="grid grid-cols-2 gap-4 h-full p-3">
+                  {/* Canvas Area - Left Half */}
+                  <div className="flex flex-col">
+                    <div className="mb-2">
+                      <p className="text-xs text-gray-600">
+                        <strong>Shift+Click</strong> нов slot | <strong>Click</strong> селекция | <strong>Drag</strong> преместване
+                      </p>
+                    </div>
+                    
+                    <div 
+                      ref={canvasRef}
+                      className="relative w-full bg-gray-100 border-2 border-gray-300 rounded-lg overflow-hidden cursor-crosshair flex-1"
+                      style={{ 
+                        minHeight: '400px',
+                        backgroundImage: backgroundImage ? `url('${backgroundImage}')` : 'linear-gradient(45deg, #f3f4f6 25%, transparent 25%), linear-gradient(-45deg, #f3f4f6 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f3f4f6 75%), linear-gradient(-45deg, transparent 75%, #f3f4f6 75%)',
+                        backgroundSize: backgroundImage ? 'cover' : '20px 20px',
+                        backgroundPosition: backgroundImage ? 'center' : '0 0, 0 10px, 10px -10px, -10px 0px'
+                      }}
+                      onClick={handleCanvasClick}
+                    >
+                      {/* Background image as img element for debugging */}
+                      {backgroundImage && (
+                        <img
+                          src={backgroundImage}
+                          alt="Background"
+                          className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                          onError={(e) => console.error('Background image failed to load:', backgroundImage)}
+                          onLoad={() => console.log('Background image loaded successfully:', backgroundImage)}
+                        />
+                      )}
+                      {/* Render Slots */}
+                      {desktopSlots.map((slot) => (
+                        <div
+                          key={slot.id}
+                          className={`absolute transform -translate-x-1/2 -translate-y-1/2 rounded-full border-4 cursor-pointer transition-all ${
+                            selectedSlot === slot.id 
+                              ? 'border-blue-500 bg-blue-200' 
+                              : 'border-white bg-white/20 hover:bg-white/40'
+                          }`}
+                          style={{
+                            top: slot.position.top,
+                            left: slot.position.left,
+                            width: slot.diameter,
+                            height: slot.diameter,
+                          }}
+                          onClick={(e) => handleSlotClick(slot.id, e)}
+                          onMouseDown={(e) => handleSlotMouseDown(slot.id, e)}
+                        >
+                          <div className="w-full h-full flex items-center justify-center text-xs font-bold">
+                            {slot.index.join(',')}
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {/* Canvas Overlay Info */}
+                      <div className="absolute bottom-4 left-4 bg-black/70 text-white px-3 py-1 rounded text-sm">
+                        Desktop Slots: {desktopSlots.length}
+                      </div>
+                      
+                      {/* No background message */}
+                      {!backgroundFileName && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                          <div className="bg-white/90 px-4 py-2 rounded-lg text-center">
+                            <p className="text-sm font-medium text-gray-700">Няма избрана фонова картина</p>
+                            <p className="text-xs text-gray-500 mt-1">Качете файл в секцията "Настройки на портал"</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Properties Panel - Right Half */}
+                  <div className="flex flex-col">
+                    <div className="bg-gray-50 p-4 rounded-lg flex-1 overflow-y-auto">
+                      <h3 className="font-semibold mb-4 text-lg">Properties</h3>
+                      
+                      {selectedSlotData ? (
+                        <div className="space-y-4">
+                          {/* Slot ID */}
+                          <div>
+                            <Label className="text-sm text-gray-500">Slot ID</Label>
+                            <p className="text-sm font-mono bg-white p-2 rounded border break-all">
+                              {selectedSlotData.id}
+                            </p>
+                          </div>
+
+                          {/* Index Selection */}
+                          <div>
+                            <Label className="text-sm font-medium">Index</Label>
+                            <Select 
+                              value={selectedSlotData.index[0]} 
+                              onValueChange={(value) => updateSlot(selectedSlotData.id, { index: [value] })}
+                            >
+                              <SelectTrigger className="h-10">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableIndices.map((indexItem, idx) => (
+                                  <SelectItem key={selectedSlotData.id + '-' + idx} value={indexItem.value}>
+                                    {indexItem.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {/* Position */}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label className="text-sm font-medium">Top (%)</Label>
+                              <Input 
+                                type="number" 
+                                step="0.1"
+                                className="h-10"
+                                value={parseFloat(selectedSlotData.position.top)} 
+                                onChange={(e) => updateSlot(selectedSlotData.id, { 
+                                  position: { ...selectedSlotData.position, top: `${e.target.value}%` }
+                                })}
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-sm font-medium">Left (%)</Label>
+                              <Input 
+                                type="number" 
+                                step="0.1"
+                                className="h-10"
+                                value={parseFloat(selectedSlotData.position.left)} 
+                                onChange={(e) => updateSlot(selectedSlotData.id, { 
+                                  position: { ...selectedSlotData.position, left: `${e.target.value}%` }
+                                })}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Diameter */}
+                          <div>
+                            <Label className="text-sm font-medium">Diameter (%)</Label>
+                            <Input 
+                              type="number" 
+                              step="0.5"
+                              className="h-10"
+                              value={parseFloat(selectedSlotData.diameter)} 
+                              onChange={(e) => updateSlot(selectedSlotData.id, { diameter: `${e.target.value}%` })}
+                            />
+                          </div>
+
+                          {/* Delete Button */}
+                          <Button 
+                            variant="destructive" 
+                            className="w-full mt-6"
+                            onClick={() => deleteSlot(selectedSlotData.id)}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete Slot
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="text-center text-gray-500 mt-12">
+                          <p className="text-lg mb-2">Селектирайте slot за редактиране</p>
+                          <p className="text-sm">Shift+Click върху canvas за създаване на нов slot</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* Mobile Tab */}
+              <TabsContent value="mobile" className="flex-1 overflow-hidden">
+                <div className="grid grid-cols-2 gap-4 h-full p-3">
+                  {/* Mobile Canvas Area - Left Half */}
+                  <div className="flex flex-col">
+                    <div className="mb-2">
+                      <p className="text-xs text-gray-600">
+                        <strong>Shift+Click</strong> нов slot | <strong>Click</strong> селекция | <strong>Drag</strong> преместване
+                      </p>
+                    </div>
+                    
+                    <div 
+                      ref={mobileCanvasRef}
+                      className="relative w-full bg-gray-100 border-2 border-gray-300 rounded-lg overflow-hidden cursor-crosshair flex-1"
+                      style={{ 
+                        minHeight: '400px',
+                        backgroundImage: backgroundImage ? `url('${backgroundImage}')` : 'linear-gradient(45deg, #f3f4f6 25%, transparent 25%), linear-gradient(-45deg, #f3f4f6 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f3f4f6 75%), linear-gradient(-45deg, transparent 75%, #f3f4f6 75%)',
+                        backgroundSize: backgroundImage ? 'cover' : '20px 20px',
+                        backgroundPosition: backgroundImage ? 'center' : '0 0, 0 10px, 10px -10px, -10px 0px'
+                      }}
+                      onClick={handleCanvasClick}
+                    >
+                      {/* Background image as img element for debugging */}
+                      {backgroundImage && (
+                        <img
+                          src={backgroundImage}
+                          alt="Background"
+                          className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                          onError={(e) => console.error('Mobile background image failed to load:', backgroundImage)}
+                          onLoad={() => console.log('Mobile background image loaded successfully:', backgroundImage)}
+                        />
+                      )}
+                      {/* Render Mobile Slots */}
+                      {mobileSlots.map((slot) => (
+                        <div
+                          key={slot.id}
+                          className={`absolute transform -translate-x-1/2 -translate-y-1/2 rounded-full border-4 cursor-pointer transition-all ${
+                            selectedSlot === slot.id 
+                              ? 'border-green-500 bg-green-200' 
+                              : 'border-white bg-white/20 hover:bg-white/40'
+                          }`}
+                          style={{
+                            top: slot.position.top,
+                            left: slot.position.left,
+                            width: slot.diameter,
+                            height: slot.diameter,
+                          }}
+                          onClick={(e) => handleSlotClick(slot.id, e)}
+                          onMouseDown={(e) => handleSlotMouseDown(slot.id, e)}
+                        >
+                          <div className="w-full h-full flex items-center justify-center text-xs font-bold">
+                            {slot.index.join(',')}
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {/* Canvas Overlay Info */}
+                      <div className="absolute bottom-4 left-4 bg-black/70 text-white px-3 py-1 rounded text-sm">
+                        Mobile Slots: {mobileSlots.length}
+                      </div>
+                      
+                      {/* No background message */}
+                      {!backgroundFileName && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                          <div className="bg-white/90 px-4 py-2 rounded-lg text-center">
+                            <p className="text-sm font-medium text-gray-700">Няма избрана фонова картина</p>
+                            <p className="text-xs text-gray-500 mt-1">Качете файл в секцията "Настройки на портал"</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Properties Panel - Right Half (shared with Desktop) */}
+                  <div className="flex flex-col">
+                    {/* Generated Mobile File Preview */}
+                    {generatedFiles.mobile && (
+                      <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <h4 className="text-sm font-semibold text-green-800 mb-2">Генериран мобилен файл</h4>
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={`/images/backgrounds/${generatedFiles.mobile}`}
+                            alt="Mobile background"
+                            className="w-16 h-16 object-cover rounded border"
+                          />
+                          <div className="flex-1">
+                            <p className="text-xs font-mono text-green-700 break-all">
+                              {generatedFiles.mobile}
+                            </p>
+                            <p className="text-xs text-green-600 mt-1">
+                              70% от оригиналния размер
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="bg-gray-50 p-4 rounded-lg flex-1 overflow-y-auto">
+                      <h3 className="font-semibold mb-4 text-lg">Properties</h3>
+                      
+                      {selectedSlotData ? (
+                        <div className="space-y-4">
+                          {/* Slot ID */}
+                          <div>
+                            <Label className="text-sm text-gray-500">Slot ID</Label>
+                            <p className="text-sm font-mono bg-white p-2 rounded border break-all">
+                              {selectedSlotData.id}
+                            </p>
+                          </div>
+
+                          {/* Index Selection */}
+                          <div>
+                            <Label className="text-sm font-medium">Index</Label>
+                            <Select 
+                              value={selectedSlotData.index[0]} 
+                              onValueChange={(value) => updateSlot(selectedSlotData.id, { index: [value] })}
+                            >
+                              <SelectTrigger className="h-10">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableIndices.map((indexItem, i) => (
+                                  <SelectItem key={(selectedSlotData?.id || 'slot') + '-' + indexItem.value + '-' + i} value={indexItem.value}>
+                                    {indexItem.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {/* Position */}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <Label className="text-sm font-medium">Top (%)</Label>
+                              <Input 
+                                type="number" 
+                                step="0.1"
+                                className="h-10"
+                                value={parseFloat(selectedSlotData.position.top)} 
+                                onChange={(e) => updateSlot(selectedSlotData.id, { 
+                                  position: { ...selectedSlotData.position, top: `${e.target.value}%` }
+                                })}
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-sm font-medium">Left (%)</Label>
+                              <Input 
+                                type="number" 
+                                step="0.1"
+                                className="h-10"
+                                value={parseFloat(selectedSlotData.position.left)} 
+                                onChange={(e) => updateSlot(selectedSlotData.id, { 
+                                  position: { ...selectedSlotData.position, left: `${e.target.value}%` }
+                                })}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Diameter */}
+                          <div>
+                            <Label className="text-sm font-medium">Diameter (%)</Label>
+                            <Input 
+                              type="number" 
+                              step="0.5"
+                              className="h-10"
+                              value={parseFloat(selectedSlotData.diameter)} 
+                              onChange={(e) => updateSlot(selectedSlotData.id, { diameter: `${e.target.value}%` })}
+                            />
+                          </div>
+
+                          {/* Delete Button */}
+                          <Button 
+                            variant="destructive" 
+                            className="w-full mt-6"
+                            onClick={() => deleteSlot(selectedSlotData.id)}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete Slot
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="text-center text-gray-500 mt-12">
+                          <p className="text-lg mb-2">Селектирайте slot за редактиране</p>
+                          <p className="text-sm">Shift+Click върху canvas за създаване на нов slot</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* Icon Tab */}
+              <TabsContent value="icon" className="flex-1 overflow-hidden">
+                <div className="h-full p-4">
+                  {/* Generated Icon File Preview */}
+                  {generatedFiles.icon && (
+                    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <h4 className="text-sm font-semibold text-blue-800 mb-2">Генерирана икона</h4>
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={`/images/backgrounds/${generatedFiles.icon}`}
+                          alt="Generated icon"
+                          className="w-16 h-16 object-cover rounded border"
+                        />
+                        <div className="flex-1">
+                          <p className="text-xs font-mono text-blue-700 break-all">
+                            {generatedFiles.icon}
+                          </p>
+                          <p className="text-xs text-blue-600 mt-1">
+                            200x200 пиксела
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="mb-4">
+                    <h3 className="text-lg font-semibold mb-2">Icon Gallery</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Изберете икона за портала. Избраната икона: 
+                      <span className="font-semibold ml-1">
+                        {selectedIcon || 'Няма избрана'}
+                      </span>
+                    </p>
+                  </div>
+                  
+                  {/* Icon Grid */}
+                  <div className="grid grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-3 h-full overflow-y-auto pr-2">
+                    {availableIcons.map((iconFile) => (
+                      <div
+                        key={iconFile}
+                        className={`relative aspect-square border-2 rounded-lg cursor-pointer transition-all hover:scale-105 group ${
+                          selectedIcon === iconFile 
+                            ? 'border-blue-500 bg-blue-50' 
+                            : 'border-gray-300 hover:border-gray-400'
+                        }`}
+                        onClick={() => handleIconSelect(iconFile)}
+                        title={iconFile}
+                      >
+                        {/* Icon Image */}
+                        <img
+                          src={`/images/${iconFile}`}
+                          alt={iconFile}
+                          className="w-full h-full object-contain p-1 rounded"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                          }}
+                        />
+                        
+                        {/* Selected Indicator */}
+                        {selectedIcon === iconFile && (
+                          <div className="absolute -top-2 -right-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                            <span className="text-white text-xs">✓</span>
+                          </div>
+                        )}
+                        
+                        {/* Hover Tooltip */}
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                          {iconFile.replace(/^\d+-/, '').replace('.png', '')}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Upload Zone */}
+                  <div 
+                    className="mt-6 border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors cursor-pointer"
+                    onClick={() => document.getElementById('icon-upload')?.click()}
+                  >
+                    <div className="text-gray-500">
+                      <p className="text-sm font-medium">Upload нова икона</p>
+                      <p className="text-xs mt-1">Drag & drop файл тук или кликнете за избор</p>
+                      <p className="text-xs text-gray-400 mt-2">Поддържани формати: PNG, JPG (препоръчително 128x128px)</p>
+                    </div>
+                    <input
+                      id="icon-upload"
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg"
+                      onChange={handleIconUpload}
+                      className="hidden"
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* Variants Tab */}
+              <TabsContent value="variants" className="flex-1 overflow-hidden">
+                <div className="h-full p-4">
+                  <div className="mb-4">
+                    <h3 className="text-lg font-semibold mb-2">Настройки за варианти</h3>
+                    <p className="text-sm text-gray-600">
+                      Конфигурирайте настройките за всеки вариант на играта (възрастова група).
+                    </p>
+                  </div>
+
+                  <div className="space-y-6">
+                    {availableVariants.map((variant) => (
+                      <div key={variant.id} className="border rounded-lg p-4 bg-gray-50">
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <h4 className="font-semibold text-base">{variant.displayName}</h4>
+                            <p className="text-sm text-gray-600">{variant.description}</p>
+                            <p className="text-xs text-gray-500 mt-1">ID: {variant.id}</p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {/* Min Cells */}
+                          <div>
+                            <Label className="text-sm font-medium">Мин. клетки</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              max="20"
+                              className="h-10 mt-1"
+                              value={variantSettings[variant.id]?.minCells ?? 1}
+                              onChange={(e) => {
+                                const value = parseInt(e.target.value) || 1;
+                                setVariantSettings(prev => ({
+                                  ...prev,
+                                  [variant.id]: {
+                                    ...prev[variant.id],
+                                    minCells: value,
+                                    maxCells: Math.max(value, prev[variant.id]?.maxCells ?? value + 2)
+                                  }
+                                }));
+                              }}
+                            />
+                          </div>
+
+                          {/* Max Cells */}
+                          <div>
+                            <Label className="text-sm font-medium">Макс. клетки</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              max="20"
+                              className="h-10 mt-1"
+                              value={variantSettings[variant.id]?.maxCells ?? (desktopSlots.length + 2)}
+                              onChange={(e) => {
+                                const value = parseInt(e.target.value) || 1;
+                                setVariantSettings(prev => ({
+                                  ...prev,
+                                  [variant.id]: {
+                                    ...prev[variant.id],
+                                    maxCells: value,
+                                    minCells: Math.min(value, prev[variant.id]?.minCells ?? 1)
+                                  }
+                                }));
+                              }}
+                            />
+                          </div>
+
+                          {/* Has Extra Items */}
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`extra-items-${variant.id}`}
+                              checked={variantSettings[variant.id]?.hasExtraItems ?? false}
+                              onCheckedChange={(checked) => {
+                                setVariantSettings(prev => ({
+                                  ...prev,
+                                  [variant.id]: {
+                                    ...prev[variant.id],
+                                    hasExtraItems: checked as boolean
+                                  }
+                                }));
+                              }}
+                            />
+                            <Label htmlFor={`extra-items-${variant.id}`} className="text-sm font-medium">
+                              +2 допълнителни елемента
+                            </Label>
+                          </div>
+                        </div>
+
+                        {/* Preview */}
+                        <div className="mt-3 p-3 bg-white rounded border">
+                          <p className="text-xs text-gray-600 mb-2">Преглед на настройките:</p>
+                          <div className="flex items-center gap-4 text-sm">
+                            <span>Клетки: {variantSettings[variant.id]?.minCells ?? 1} - {variantSettings[variant.id]?.maxCells ?? (desktopSlots.length + 2)}</span>
+                            <span>Допълнителни елементи: {variantSettings[variant.id]?.hasExtraItems ? 'Да (+2)' : 'Не'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    {availableVariants.length === 0 && (
+                      <div className="text-center text-gray-500 py-8">
+                        <p>Няма налични варианти. Моля, първо създайте варианти в системата.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       </DialogContent>

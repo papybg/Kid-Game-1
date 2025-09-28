@@ -5,7 +5,6 @@ interface ChoiceItemProps {
   item: GameItem;
   isUsed?: boolean;
   isDisabled?: boolean;
-  shouldDisappear?: boolean; // New prop for disappearing animation
   isSelected?: boolean; // New prop for selected state
   isAnimating?: boolean; // New prop for placement animation
   targetPosition?: { top: number; left: number }; // Target position for animation
@@ -13,7 +12,7 @@ interface ChoiceItemProps {
   className?: string;
 }
 
-export function ChoiceItem({ item, isUsed, isDisabled, shouldDisappear, isSelected, isAnimating, targetPosition, onClick, className }: ChoiceItemProps) {
+export function ChoiceItem({ item, isUsed, isDisabled, isSelected, isAnimating, targetPosition, onClick, className }: ChoiceItemProps) {
   const handleClick = () => {
     if ((!isUsed && !isDisabled) && onClick) {
       onClick(item);
@@ -23,7 +22,7 @@ export function ChoiceItem({ item, isUsed, isDisabled, shouldDisappear, isSelect
   return (
     <div className="p-2">
       <img
-        src={item.image}
+        src={item.image || ""}
         alt={item.name}
         className={cn(
           "choice-item w-32 h-32 object-contain flex-shrink-0 transition-all duration-200 cursor-pointer",

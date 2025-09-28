@@ -147,7 +147,7 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
       usedItemIds.add(randomItem.id);
     } else {
       // Fallback: allow reusing items if we run out
-      const fallbackItems = correctItemsPool.filter(item => canItemGoInSlot(item.index, cell.index));
+      const fallbackItems = correctItemsPool.filter(item => canItemGoInSlot(item.index, cell.index) && !usedItemIds.has(item.id));
       if (fallbackItems.length > 0) {
         const randomItem = selectRandom(fallbackItems, 1)[0];
         selectedCorrectItems.push(randomItem);
@@ -177,7 +177,7 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
   // Add confusing items from remaining items (exclude joker items and already used items)
   let confusingItems: Item[] = [];
   if (neededConfusing > 0) {
-    const availableConfusingItems = allItems.filter(item => 
+    const availableConfusingItems = allItems.filter(item =>
       !usedItemIds.has(item.id) && item.index !== 'js'
     );
     const selectedConfusing = selectRandom(availableConfusingItems, Math.min(neededConfusing, availableConfusingItems.length));
@@ -186,47 +186,43 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
     selectedConfusing.forEach(item => usedItemIds.add(item.id));
   }
 
-  // If we still don't have enough items, fill with any remaining items (avoid duplicates if possible)
+  // Combine all items
   const finalItems = [...selectedCorrectItems, ...confusingItems];
+
+  // If we still don't have enough items, fill with any remaining items (avoid duplicates)
   if (finalItems.length < totalItemCount) {
     const remainingNeeded = totalItemCount - finalItems.length;
-    const usedItemIdsSet = new Set(finalItems.map(item => item.id));
-    const availableItems = allItems.filter(item => 
-      item.index !== 'js' && !usedItemIdsSet.has(item.id)
+    const availableItems = allItems.filter(item =>
+      item.index !== 'js' && !usedItemIds.has(item.id)
     );
-    
+
     if (availableItems.length >= remainingNeeded) {
-      // We have enough unique items
       const additionalItems = selectRandom(availableItems, remainingNeeded);
       finalItems.push(...additionalItems);
+      additionalItems.forEach(item => usedItemIds.add(item.id));
     } else {
-      // Not enough unique items, use what we have and allow some duplicates
+      // Emergency fallback - add what we can
       finalItems.push(...availableItems);
-      const stillNeeded = remainingNeeded - availableItems.length;
-      if (stillNeeded > 0) {
-        const duplicateItems = selectRandom(
-          allItems.filter(item => item.index !== 'js'), 
-          stillNeeded
-        );
-        finalItems.push(...duplicateItems);
-      }
+      availableItems.forEach(item => usedItemIds.add(item.id));
+      console.warn(`Warning: Not enough unique items for game session. Added ${availableItems.length} items, still need ${remainingNeeded - availableItems.length} more.`);
     }
   }
 
   const shuffledItems = shuffleArray(finalItems);
 
-  // Ако все още няма достатъчно предмети, добави обект "тест"
+  // Ако все още няма достатъчно предмети, добави уникални тестови обекти
   if (shuffledItems.length < totalItemCount) {
-    const testItem = {
-      id: 9999,
-      name: "test",
-      image: "/images/1758906998565-smile.png",
-      index: "z",
-      category: "тест",
-      audio: null,
-      createdAt: null
-    };
-    while (shuffledItems.length < totalItemCount) {
+    const missingCount = totalItemCount - shuffledItems.length;
+    for (let i = 0; i < missingCount; i++) {
+      const testItem = {
+        id: 9999 + i, // Уникален ID за всеки тестов обект
+        name: `test-${i + 1}`,
+        image: "/images/1758906998565-smile.png",
+        index: "z",
+        category: "тест",
+        audio: null,
+        createdAt: null
+      };
       shuffledItems.push(testItem);
     }
   }

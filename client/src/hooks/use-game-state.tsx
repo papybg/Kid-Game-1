@@ -74,7 +74,7 @@ export function useGameState({ cells, items }: UseGameStateProps) {
     setTimeout(() => setGameState(prev => ({ ...prev, feedback: null })), 2000);
   }, []);
 
-  const makeChoice = React.useCallback((item: GameItem, slot: Slot, isSimpleMode: boolean) => {
+  const makeChoice = React.useCallback((item: GameItem, slot: Slot, isSimpleMode: boolean, removeFromChoiceItems: boolean = true) => {
     const slotId = `${slot.position.top}-${slot.position.left}`;
     const isValid = isValidChoice(slot, item);
 
@@ -83,6 +83,7 @@ export function useGameState({ cells, items }: UseGameStateProps) {
         const newPlacedItems = { ...prev.placedItems, [slotId]: item };
         const newUsedItems = [...prev.usedItems, item.id];
         const newAvailableSlots = prev.availableSlots.filter(s => `${s.position.top}-${s.position.left}` !== slotId);
+        const newChoiceItems = removeFromChoiceItems ? prev.choiceItems.filter(choiceItem => choiceItem.id !== item.id) : prev.choiceItems;
         
         // КОРЕКЦИЯ: Проверяваме за победа само ако играта е вече стартирала
         const isComplete = prev.hasStarted && newAvailableSlots.length === 0;
@@ -92,12 +93,41 @@ export function useGameState({ cells, items }: UseGameStateProps) {
           placedItems: newPlacedItems,
           usedItems: newUsedItems,
           availableSlots: newAvailableSlots,
+          choiceItems: newChoiceItems, // <-- ОБНОВЯВАМЕ CHOICE ITEMS
           isGameComplete: isComplete,
           isPlaying: !isComplete,
         };
       });
     }
     return isValid;
+  }, []);
+
+  const removeFromChoiceItems = React.useCallback((itemId: number) => {
+    setGameState(prev => ({
+      ...prev,
+      choiceItems: prev.choiceItems.filter(choiceItem => choiceItem.id !== itemId),
+    }));
+  }, []);
+
+  const placeItemInSlot = React.useCallback((item: GameItem, slotId: string) => {
+    setGameState(prev => ({
+      ...prev,
+      placedItems: { ...prev.placedItems, [slotId]: item },
+      usedItems: [...prev.usedItems, item.id],
+    }));
+  }, []);
+
+  const completeSlot = React.useCallback((slotId: string) => {
+    setGameState(prev => {
+      const newAvailableSlots = prev.availableSlots.filter(s => `${s.position.top}-${s.position.left}` !== slotId);
+      const isComplete = prev.hasStarted && newAvailableSlots.length === 0;
+      return {
+        ...prev,
+        availableSlots: newAvailableSlots,
+        isGameComplete: isComplete,
+        isPlaying: !isComplete,
+      };
+    });
   }, []);
 
   const removeCurrentSlot = React.useCallback((slot: Slot) => {
@@ -119,5 +149,8 @@ export function useGameState({ cells, items }: UseGameStateProps) {
     isGameComplete: gameState.isGameComplete,
     timeElapsed: gameState.timeElapsed,
     removeCurrentSlot,
+    removeFromChoiceItems,
+    placeItemInSlot,
+    completeSlot,
   };
 }
