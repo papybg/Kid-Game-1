@@ -222,6 +222,20 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
     }
   };
 
+  const removeIndexFromSlot = (slotId: string, indexToRemove: string) => {
+    // Convert mobile slot ID to desktop slot ID if necessary
+    const desktopSlotId = slotId.startsWith('mobile-slot-') 
+      ? slotId.replace('mobile-slot-', 'desktop-slot-')
+      : slotId;
+    
+    // Remove the index from the slot
+    setDesktopSlots(prev => prev.map(slot => 
+      slot.id === desktopSlotId 
+        ? { ...slot, index: slot.index.filter(idx => idx !== indexToRemove) }
+        : slot
+    ));
+  };
+
   const handleCanvasClick = (e: React.MouseEvent) => {
     if (e.shiftKey) {
       createSlot(e.clientX, e.clientY);
@@ -849,8 +863,22 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
                           onClick={(e) => handleSlotClick(slot.id, e)}
                           onMouseDown={(e) => handleSlotMouseDown(slot.id, e)}
                         >
-                          <div className="w-full h-full flex items-center justify-center text-xs font-bold">
-                            {slot.index.join(',')}
+                          <div className="w-full h-full flex items-center justify-center text-xs font-bold flex-wrap gap-1 p-1">
+                            {slot.index.map((idx, index) => (
+                              <span key={idx} className="bg-white/90 text-black px-1 py-0.5 rounded text-xs flex items-center gap-1">
+                                {idx}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeIndexFromSlot(slot.id, idx);
+                                  }}
+                                  className="text-red-500 hover:text-red-700 text-xs leading-none"
+                                  title={`Премахни индекс ${idx}`}
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
                           </div>
                         </div>
                       ))}
@@ -887,24 +915,52 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
                             </p>
                           </div>
 
-                          {/* Index Selection */}
+                          {/* Index Management */}
                           <div>
-                            <Label className="text-sm font-medium">Index</Label>
-                            <Select 
-                              value={selectedSlotData.index[0]} 
-                              onValueChange={(value) => updateSlot(selectedSlotData.id, { index: [value] })}
-                            >
-                              <SelectTrigger className="h-10">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {availableIndices.map((indexItem, idx) => (
-                                  <SelectItem key={selectedSlotData.id + '-' + idx} value={indexItem.value}>
-                                    {indexItem.label}
-                                  </SelectItem>
+                            <Label className="text-sm font-medium mb-2 block">Индекси</Label>
+                            <div className="space-y-2">
+                              {/* Current indices display */}
+                              <div className="flex flex-wrap gap-1">
+                                {selectedSlotData.index.map((idx) => (
+                                  <span key={idx} className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs flex items-center gap-1">
+                                    {idx}
+                                    <button
+                                      onClick={() => removeIndexFromSlot(selectedSlotData.id, idx)}
+                                      className="text-red-500 hover:text-red-700 text-xs leading-none"
+                                      title={`Премахни индекс ${idx}`}
+                                    >
+                                      ×
+                                    </button>
+                                  </span>
                                 ))}
-                              </SelectContent>
-                            </Select>
+                              </div>
+                              
+                              {/* Add new index */}
+                              <div className="flex gap-2">
+                                <Select 
+                                  onValueChange={(value) => {
+                                    if (!selectedSlotData.index.includes(value)) {
+                                      updateSlot(selectedSlotData.id, { 
+                                        index: [...selectedSlotData.index, value] 
+                                      });
+                                    }
+                                  }}
+                                >
+                                  <SelectTrigger className="h-8 flex-1">
+                                    <SelectValue placeholder="Добави индекс..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {availableIndices
+                                      .filter(indexItem => !selectedSlotData.index.includes(indexItem.value))
+                                      .map((indexItem, idx) => (
+                                        <SelectItem key={selectedSlotData.id + '-add-' + idx} value={indexItem.value}>
+                                          {indexItem.label}
+                                        </SelectItem>
+                                      ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
                           </div>
 
                           {/* Position */}
@@ -1018,8 +1074,22 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
                           onClick={(e) => handleSlotClick(slot.id, e)}
                           onMouseDown={(e) => handleSlotMouseDown(slot.id, e)}
                         >
-                          <div className="w-full h-full flex items-center justify-center text-xs font-bold">
-                            {slot.index.join(',')}
+                          <div className="w-full h-full flex items-center justify-center text-xs font-bold flex-wrap gap-1 p-1">
+                            {slot.index.map((idx, index) => (
+                              <span key={idx} className="bg-white/90 text-black px-1 py-0.5 rounded text-xs flex items-center gap-1">
+                                {idx}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeIndexFromSlot(slot.id, idx);
+                                  }}
+                                  className="text-red-500 hover:text-red-700 text-xs leading-none"
+                                  title={`Премахни индекс ${idx}`}
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
                           </div>
                         </div>
                       ))}
@@ -1078,24 +1148,52 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
                             </p>
                           </div>
 
-                          {/* Index Selection */}
+                          {/* Index Management */}
                           <div>
-                            <Label className="text-sm font-medium">Index</Label>
-                            <Select 
-                              value={selectedSlotData.index[0]} 
-                              onValueChange={(value) => updateSlot(selectedSlotData.id, { index: [value] })}
-                            >
-                              <SelectTrigger className="h-10">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {availableIndices.map((indexItem, i) => (
-                                  <SelectItem key={(selectedSlotData?.id || 'slot') + '-' + indexItem.value + '-' + i} value={indexItem.value}>
-                                    {indexItem.label}
-                                  </SelectItem>
+                            <Label className="text-sm font-medium mb-2 block">Индекси</Label>
+                            <div className="space-y-2">
+                              {/* Current indices display */}
+                              <div className="flex flex-wrap gap-1">
+                                {selectedSlotData.index.map((idx) => (
+                                  <span key={idx} className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs flex items-center gap-1">
+                                    {idx}
+                                    <button
+                                      onClick={() => removeIndexFromSlot(selectedSlotData.id, idx)}
+                                      className="text-red-500 hover:text-red-700 text-xs leading-none"
+                                      title={`Премахни индекс ${idx}`}
+                                    >
+                                      ×
+                                    </button>
+                                  </span>
                                 ))}
-                              </SelectContent>
-                            </Select>
+                              </div>
+                              
+                              {/* Add new index */}
+                              <div className="flex gap-2">
+                                <Select 
+                                  onValueChange={(value) => {
+                                    if (!selectedSlotData.index.includes(value)) {
+                                      updateSlot(selectedSlotData.id, { 
+                                        index: [...selectedSlotData.index, value] 
+                                      });
+                                    }
+                                  }}
+                                >
+                                  <SelectTrigger className="h-8 flex-1">
+                                    <SelectValue placeholder="Добави индекс..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {availableIndices
+                                      .filter(indexItem => !selectedSlotData.index.includes(indexItem.value))
+                                      .map((indexItem, i) => (
+                                        <SelectItem key={(selectedSlotData?.id || 'slot') + '-add-' + indexItem.value + '-' + i} value={indexItem.value}>
+                                          {indexItem.label}
+                                        </SelectItem>
+                                      ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
                           </div>
 
                           {/* Position */}

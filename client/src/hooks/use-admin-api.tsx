@@ -29,12 +29,19 @@ export interface CategoryIndex {
   description: string;
 }
 
+export interface IndexInfo {
+  index: string;
+  count: number;
+  descriptions: string[] | null;
+  categories: string[] | null;
+}
+
 export interface CreateItemData {
   name: string;
   index: string;
   category: string;
   image?: File;
-  audio?: File; // Добавяме звук към CreateItemData
+  audio?: File | string | null; // може да е File за upload или string path или null за премахване
 }
 
 import apiPath from '../lib/config';
@@ -124,26 +131,48 @@ export const useUpdateItem = () => {
   
   return useMutation({
     mutationFn: async ({ id, data }: { id: number; data: CreateItemData }): Promise<AdminItem> => {
-      const formData = new FormData();
-      formData.append("name", data.name);
-      formData.append("index", data.index);
-      formData.append("category", data.category);
-      if (data.image) {
-        formData.append("image", data.image);
-      }
-      if (data.audio) {
-        formData.append("audio", data.audio);
-      }
+      // Ако има файлове, използвай FormData
+      if (data.image || data.audio) {
+        const formData = new FormData();
+        formData.append("name", data.name);
+        formData.append("index", data.index);
+        formData.append("category", data.category);
+        if (data.image) {
+          formData.append("image", data.image);
+        }
+        if (data.audio) {
+          formData.append("audio", data.audio);
+        }
 
-      const response = await fetch(`${API_BASE}/items/${id}`, {
-        method: "PUT",
-        body: formData,
-      });
+        const response = await fetch(`${API_BASE}/items/${id}`, {
+          method: "PUT",
+          body: formData,
+        });
 
-      if (!response.ok) {
-        throw new Error("Failed to update item");
+        if (!response.ok) {
+          throw new Error("Failed to update item");
+        }
+        return response.json();
+      } else {
+        // Ако няма файлове, използвай JSON
+        const response = await fetch(`${API_BASE}/items/${id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: data.name,
+            index: data.index,
+            category: data.category,
+            audio: data.audio // може да е string path или null
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to update item");
+        }
+        return response.json();
       }
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-items"] });
@@ -193,6 +222,49 @@ export const useDeleteItem = () => {
       }
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-items"] });
+    },
+  });
+};
+
+// GET всички индекси с броя предмети за всеки
+export const useAdminIndices = () => {
+  return useQuery({
+    queryKey: ["admin-indices"],
+    queryFn: async (): Promise<IndexInfo[]> => {
+      const response = await fetch(`${API_BASE}/indices`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch indices");
+      }
+      return response.json();
+    },
+  });
+};
+
+// DELETE избрани индекси
+export const useDeleteIndices = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (indices: string[]): Promise<{ message: string; deletedCount: number; deletedIndices: string[] }> => {
+      const response = await fetch(`${API_BASE}/indices`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ indices }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to delete indices");
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      // Refresh indices and items lists
+      queryClient.invalidateQueries({ queryKey: ["admin-indices"] });
       queryClient.invalidateQueries({ queryKey: ["admin-items"] });
     },
   });

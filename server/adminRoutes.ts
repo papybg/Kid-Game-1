@@ -155,7 +155,7 @@ router.put('/items/:id', upload.fields([
 ]), async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { name, index, category } = req.body;
+    const { name, index, category, audio: audioPath } = req.body;
     const files = req.files as { [fieldname: string]: Express.Multer.File[] };
 
     // Провери дали предметът съществува
@@ -181,6 +181,7 @@ router.put('/items/:id', upload.fields([
       }
     }
 
+    // Ако има нов аудио файл ИЛИ е подаден audio path
     if (files?.audio?.[0]) {
       updateData.audio = `/audio/${files.audio[0].filename}`;
 
@@ -192,6 +193,9 @@ router.put('/items/:id', upload.fields([
           fs.unlinkSync(oldAudioPath);
         }
       }
+    } else if (audioPath !== undefined) {
+      // Ако е подаден audio path (включително null за премахване)
+      updateData.audio = audioPath;
     }
 
     // Обнови в базата
@@ -256,35 +260,51 @@ router.delete('/items/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/admin/categories/cleanup - delete category indices with empty or null description
-router.delete('/categories/cleanup', async (req, res) => {
+// GET /api/admin/indices - вземи всички уникални индекси от categories_indices таблицата
+router.get('/indices', async (req, res) => {
   try {
-    // Guard: require explicit confirm=true query param to run
-    const confirm = req.query.confirm === 'true';
-    if (!confirm) {
-      return res.status(400).json({ error: 'Confirm deletion by adding ?confirm=true to the request' });
-    }
+    // Взимаме всички индекси от categories_indices таблицата
+    const indicesResult = await db
+      .select({
+        index: categoriesIndices.indexValue,
+        count: sql<number>`count(*)`,
+        descriptions: sql<string>`array_agg(${categoriesIndices.description})`,
+        categories: sql<string>`array_agg(${categoriesIndices.categoryName})`
+      })
+      .from(categoriesIndices)
+      .groupBy(categoriesIndices.indexValue)
+      .orderBy(categoriesIndices.indexValue);
 
-    // Prevent running in production accidentally
-    if (process.env.NODE_ENV === 'production') {
-      return res.status(403).json({ error: 'Cleanup endpoint is disabled in production' });
-    }
-
-    // Use raw SQL to check for NULL or empty description (avoids TypeScript overload issues)
-    const preview = await db.select().from(categoriesIndices).where(sql`(${categoriesIndices.description} IS NULL OR ${categoriesIndices.description} = '')`);
-
-    // If nothing to delete, return early
-    if (!preview || preview.length === 0) {
-      return res.json({ deletedCount: 0, rows: [] });
-    }
-
-    // Perform delete using raw SQL
-    await db.execute(sql`DELETE FROM categories_indices WHERE description IS NULL OR description = ''`);
-
-    return res.json({ deletedCount: preview.length, rows: preview });
+    res.json(indicesResult);
   } catch (error) {
-    console.error('Error cleaning categories:', error);
-    res.status(500).json({ error: 'Failed to clean categories' });
+    console.error('Error fetching indices:', error);
+    res.status(500).json({ error: 'Failed to fetch indices' });
+  }
+});
+
+// DELETE /api/admin/indices - изтрий избрани индекси от categories_indices таблицата
+router.delete('/indices', async (req, res) => {
+  try {
+    const { indices } = req.body;
+
+    if (!Array.isArray(indices) || indices.length === 0) {
+      return res.status(400).json({ error: 'Трябва да предоставите масив от индекси за изтриване' });
+    }
+
+    console.log('Deleting indices:', indices);
+
+    // Изтрий записите от categories_indices таблицата
+    const deleteResult = await db
+      .delete(categoriesIndices)
+      .where(sql`${categoriesIndices.indexValue} IN (${sql.join(indices, sql`, `)})`);
+
+    res.json({ 
+      message: `Изтрити са записите за индекси: ${indices.join(', ')}`,
+      deletedIndices: indices
+    });
+  } catch (error) {
+    console.error('Error deleting indices:', error);
+    res.status(500).json({ error: 'Failed to delete indices' });
   }
 });
 

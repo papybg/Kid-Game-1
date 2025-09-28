@@ -135,12 +135,15 @@ export default function AddItemForm({ onClose, editItem }: AddItemFormProps) {
     try {
       if (editItem) {
         // Update existing item
+        const audioData = selectedAudioFile ? selectedAudioFile : 
+                         (audioFileName ? editItem.audio : null);
+        
         await updateItemMutation.mutateAsync({
           id: editItem.id,
           data: {
             ...data,
             image: selectedFile || undefined,
-            audio: selectedAudioFile || undefined
+            audio: audioData
           }
         });
       } else {
@@ -371,13 +374,17 @@ export default function AddItemForm({ onClose, editItem }: AddItemFormProps) {
             <div className="space-y-2">
               <Label htmlFor="audio">Звук (незадължителен)</Label>
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                {selectedAudioFile ? (
+                {selectedAudioFile || audioFileName ? (
                   <div className="space-y-2">
                     <div className="flex items-center justify-center gap-2">
                       <Volume2 className="h-6 w-6 text-green-600" />
-                      <span className="text-sm font-medium text-green-700">Избран звук</span>
+                      <span className="text-sm font-medium text-green-700">
+                        {selectedAudioFile ? "Избран звук" : "Съществуващ звук"}
+                      </span>
                     </div>
-                    <p className="text-sm text-gray-600">{audioFileName}</p>
+                    <p className="text-sm text-gray-600">
+                      {selectedAudioFile ? audioFileName : audioFileName}
+                    </p>
                     <Button
                       type="button"
                       variant="outline"
