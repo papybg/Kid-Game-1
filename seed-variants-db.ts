@@ -1,5 +1,5 @@
-import { db } from './server/db.ts';
-import { gameVariants } from './shared/schema.ts';
+import { db } from './server/db.js';
+import { gameVariants } from './shared/schema.js';
 
 async function seedVariants() {
   try {

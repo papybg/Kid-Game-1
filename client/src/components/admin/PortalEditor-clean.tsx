@@ -46,6 +46,7 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
   const [slotMode, setSlotMode] = useState<'with_cells' | 'without_cells'>('with_cells');
   const [backgroundFileName, setBackgroundFileName] = useState('dolina-large.png');
   const [imageSize, setImageSize] = useState({ width: 1920, height: 1080 });
+  const [generatedFiles, setGeneratedFiles] = useState<{ desktop?: string; mobile?: string; icon?: string }>({});
   
   // Current tab state
   const [activeTab, setActiveTab] = useState('desktop');
@@ -55,12 +56,58 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
   const [availableIcons, setAvailableIcons] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Generated background files state
-  const [generatedFiles, setGeneratedFiles] = useState<{
-    desktop?: string;
-    mobile?: string;
-    icon?: string;
-  }>({});
+  // Локална логика за resize на изображения (за бързо попълване на базата)
+  const resizeImage = (
+    file: File,
+    maxWidth: number
+  ): Promise<Blob | null> => {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+
+      img.onload = () => {
+        const aspectRatio = img.height / img.width;
+        const width = Math.min(maxWidth, img.width);
+        const height = width * aspectRatio;
+
+        canvas.width = width;
+        canvas.height = height;
+
+        ctx!.drawImage(img, 0, 0, width, height);
+        URL.revokeObjectURL(objectUrl);
+
+        canvas.toBlob((blob) => resolve(blob), "image/png");
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error("Файлът не може да бъде прочетен като изображение."));
+      };
+
+      img.src = objectUrl;
+    });
+  };
+
+  // Локално генериране на mobile и icon версии (само за попълване на базата)
+  const generateLocalVersions = async (file: File) => {
+    try {
+      const img = await createImageBitmap(file);
+      const originalWidth = img.width;
+      img.close();
+
+      // Генерираме mobile версия (70% от оригинала)
+      const mobileBlob = await resizeImage(file, originalWidth * 0.7);
+      // Генерираме icon версия (200px)
+      const iconBlob = await resizeImage(file, 200);
+
+      return { mobileBlob, iconBlob };
+    } catch (error) {
+      console.warn('Локалната обработка не успя, ще се използва само сървърната:', error);
+      return { mobileBlob: null, iconBlob: null };
+    }
+  };
 
   // Variant settings state
   const [variantSettings, setVariantSettings] = useState<VariantSettings>({});
@@ -268,16 +315,28 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
       let portalIdToUse: string;
 
       if (portalId) {
-        // Editing existing portal - update portal data with variant settings
+        // Editing existing portal - update both portal and layout data
         portalIdToUse = portalId;
-        layoutId = portalId; // For existing portals, layoutId is the same as portalId
+        layoutId = portalId; // Use same ID for consistency
 
+        // Update portal with all current data
         const portalUpdateData = {
-          variantSettings: variantSettings
+          portalName: portalName.trim(),
+          fileName: backgroundFileName,
+          iconFileName: selectedIcon || backgroundFileName,
+          layouts: [layoutId],
+          cellCount: desktopSlots.length,
+          min_cells: Math.max(1, desktopSlots.length - 2),
+          max_cells: desktopSlots.length + 2,
+          item_count_rule: "equals_cells",
+          variantSettings: variantSettings,
+          isLocked: false
         };
 
-  const portalUpdateResponse = await fetch(apiPath(`/api/portals/${portalId}`), {
-          method: 'PATCH',
+        console.log('Updating existing portal:', portalUpdateData);
+
+        const portalUpdateResponse = await fetch(apiPath(`/api/portals/${portalId}`), {
+          method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
           },
@@ -285,10 +344,11 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
         });
 
         if (!portalUpdateResponse.ok) {
-          console.warn('Failed to update portal variant settings, but continuing with layout update');
-        } else {
-          console.log('Portal variant settings updated successfully');
+          const errorData = await portalUpdateResponse.json().catch(() => ({ message: 'Unknown error' }));
+          throw new Error(`Failed to update portal: ${errorData.message || portalUpdateResponse.status}`);
         }
+
+        console.log('Portal updated successfully');
       } else {
         // Creating new portal - generate IDs
         // Get existing portals to find next available ID
@@ -307,7 +367,7 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
         }
 
         portalIdToUse = `d${nextId}`;
-        layoutId = `l${Date.now()}`; // Use timestamp for layout ID
+        layoutId = portalIdToUse; // Use same ID for consistency
 
         // Create new portal first
         const portalData = {
@@ -417,7 +477,12 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
           
           // Load desktop slots
           if (layout?.slots_desktop && Array.isArray(layout.slots_desktop)) {
-            setDesktopSlots(layout.slots_desktop);
+            // Add id field to slots if missing (for backward compatibility)
+            const slotsWithIds = layout.slots_desktop.map((slot: any, index: number) => ({
+              ...slot,
+              id: slot.id || `desktop-slot-${Date.now()}-${index}`
+            }));
+            setDesktopSlots(slotsWithIds);
           }
           
           // Load mobile slots if available (they will be scaled from desktop slots)
@@ -576,13 +641,19 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
     try {
       console.log('Uploading background:', file.name);
 
-      // Create FormData for upload
+      // Първо опитваме локална обработка за бързо попълване на базата
+      const localVersions = await generateLocalVersions(file);
+      console.log('Local versions generated:', {
+        mobile: localVersions.mobileBlob?.size,
+        icon: localVersions.iconBlob?.size
+      });
+
+      // Използваме сървърната логика като основна (по-надеждна)
       const formData = new FormData();
       formData.append('background', file);
       formData.append('portalId', portalId || 'd1');
 
-      // Upload to server
-  const response = await fetch(apiPath('/api/upload/background'), {
+      const response = await fetch(apiPath('/api/upload/background'), {
         method: 'POST',
         body: formData
       });
@@ -593,13 +664,11 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
       }
 
       const result = await response.json();
-      console.log('Upload successful:', result);
+      console.log('Server upload successful:', result);
 
-      // Update state with new filenames
+      // Update state with server-generated filenames
       setBackgroundFileName(result.desktop);
       setImageSize(result.size || { width: 1920, height: 1080 });
-
-      // Store generated files for display in tabs
       setGeneratedFiles({
         desktop: result.desktop,
         mobile: result.mobile,
@@ -608,7 +677,7 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
 
       console.log('Background image set to:', `/images/backgrounds/${result.desktop}`);
 
-      alert(`Фонът е качен успешно! Създадени са файлове:\n- Desktop: ${result.desktop}\n- Mobile: ${result.mobile}\n- Icon: ${result.icon}`);
+      alert(`Фонът е качен успешно! Създадени са файлове:\n- Desktop: ${result.desktop}\n- Mobile: ${result.mobile}\n- Icon: ${result.icon}\n\nЛокалната обработка е готова за бързо попълване на базата.`);
 
     } catch (error) {
       console.error('Failed to upload background:', error);

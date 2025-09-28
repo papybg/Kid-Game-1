@@ -401,7 +401,7 @@ export class MemStorage implements IStorage {
 async function createStorage(): Promise<IStorage> {
   if (process.env.DATABASE_URL) {
     console.log("Using database storage (PostgreSQL)");
-    const { DbStorage } = await import("./db-storage.js");
+    const { DbStorage } = await import("./db-storage");
     return new DbStorage();
   } else {
     console.log("Using memory storage");

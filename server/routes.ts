@@ -115,18 +115,7 @@ export function registerRoutes(app: Express): void {
       const portalId = req.params.id;
       const updates = req.body;
       
-      // For now, we'll need to implement updatePortal in storage
-      // Since the interface doesn't have it, we'll recreate it
-      const existingPortal = await storage.getPortal(portalId);
-      if (!existingPortal) {
-        return res.status(404).json({ message: "Portal not found" });
-      }
-      
-      // Delete existing and create new one (simplified approach)
-      // In a real app, you'd implement updatePortal in storage
-      const updatedPortal = { ...existingPortal, ...updates };
-      // Note: This is a simplified approach. In production, implement proper update method
-      
+      const updatedPortal = await storage.updatePortal(portalId, updates);
       res.json(updatedPortal);
     } catch (error) {
       console.error('Failed to update portal:', error);
