@@ -1,10 +1,9 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { getStorage } from "./storage";
 import { insertUserProgressSchema, insertGameSettingsSchema } from "../shared/schema";
 import { z } from "zod";
 import { generateGameSession } from "./gameService";
 import multer from "multer";
-import sharp from "sharp";
 import { fileURLToPath } from 'url';
 import { dirname, join, parse, extname } from 'path';
 import { promises as fs } from 'fs';
@@ -13,9 +12,10 @@ import { existsSync, mkdirSync } from 'fs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Configure multer for file uploads
+// Конфигурация на multer за качване на файлове в паметта
 const upload = multer({
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  storage: multer.memoryStorage(), // Важно: файловете се обработват в паметта
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB лимит
   fileFilter: (req: any, file: any, cb: any) => {
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
@@ -25,8 +25,58 @@ const upload = multer({
   }
 });
 
-export function registerRoutes(app: Express): void {
-  // Get all portals
+export function setupRoutes(app: Express): void {
+  
+  // Качване на original, mobile и icon файлове наведнъж
+  app.post("/api/upload/all", upload.fields([
+    { name: 'original', maxCount: 1 },
+    { name: 'mobile', maxCount: 1 },
+    { name: 'icon', maxCount: 1 }
+  ]), async (req: Request, res: Response) => {
+    try {
+      const backgroundsDir = join(process.cwd(), 'client', 'public', 'images', 'backgrounds');
+      if (!existsSync(backgroundsDir)) {
+        mkdirSync(backgroundsDir, { recursive: true });
+      }
+
+      // Helper функция за записване на файл от паметта
+      const saveFile = async (file: Express.Multer.File | undefined, label: string) => {
+        if (!file) return '';
+        const baseName = parse(file.originalname).name.replace(/[^a-zA-Z0-9]/g, '_'); // Почистване на името
+        const extension = extname(file.originalname);
+        const timestamp = Date.now();
+        const fileName = `${baseName}_${label}_${timestamp}${extension}`;
+        const filePath = join(backgroundsDir, fileName);
+        await fs.writeFile(filePath, file.buffer);
+        return fileName;
+      };
+
+      // Проверка за req.files, тъй като е optional
+      if (!req.files || typeof req.files !== 'object') {
+        return res.status(400).json({ message: "No files uploaded" });
+      }
+
+      const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+      const originalFile = files.original?.[0];
+      const mobileFile = files.mobile?.[0];
+      const iconFile = files.icon?.[0];
+
+      const originalName = await saveFile(originalFile, 'desktop');
+      const mobileName = await saveFile(mobileFile, 'mobile');
+      const iconName = await saveFile(iconFile, 'icon');
+
+      res.json({
+        desktop: originalName,
+        mobile: mobileName,
+        icon: iconName
+      });
+    } catch (error) {
+      console.error('Failed to upload files:', error);
+      res.status(500).json({ message: "Failed to upload files" });
+    }
+  });
+
+  // Всички останали рутери...
   app.get("/api/portals", async (req, res) => {
     try {
       const storage = await getStorage();
@@ -37,7 +87,6 @@ export function registerRoutes(app: Express): void {
     }
   });
 
-  // Get specific portal
   app.get("/api/portals/:id", async (req, res) => {
     try {
       const storage = await getStorage();
@@ -51,40 +100,29 @@ export function registerRoutes(app: Express): void {
     }
   });
 
-  // Get specific portal with full data (portal + layout)
   app.get("/api/portals/:id/full", async (req, res) => {
     try {
       const storage = await getStorage();
-      // Decode URL-encoded portal ID (handles spaces and special characters)
       const portalId = decodeURIComponent(req.params.id);
-
-      // Get portal data
       const portal = await storage.getPortal(portalId);
+
       if (!portal) {
         return res.status(404).json({ message: "Portal not found" });
       }
 
-      // Get layout data if portal has layouts
       let layout = null;
       if (portal.layouts && portal.layouts.length > 0) {
-        const layoutId = portal.layouts[0]; // Get first layout
+        const layoutId = portal.layouts[0];
         layout = await storage.getGameLayout(layoutId);
-        console.log(`Loaded layout ${layoutId} for portal ${portalId}`);
       }
 
-      // Return combined data
-      res.json({
-        portal,
-        layout
-      });
-
+      res.json({ portal, layout });
     } catch (error) {
       console.error('Failed to fetch full portal data:', error);
       res.status(500).json({ message: "Failed to fetch portal data" });
     }
   });
 
-  // Get all game variants
   app.get("/api/game-variants", async (req, res) => {
     try {
       const storage = await getStorage();
@@ -95,12 +133,10 @@ export function registerRoutes(app: Express): void {
     }
   });
 
-  // Create new portal
   app.post("/api/portals", async (req, res) => {
     try {
       const storage = await getStorage();
-      const portalData = req.body;
-      const newPortal = await storage.createPortal(portalData);
+      const newPortal = await storage.createPortal(req.body);
       res.status(201).json(newPortal);
     } catch (error) {
       console.error('Failed to create portal:', error);
@@ -108,14 +144,10 @@ export function registerRoutes(app: Express): void {
     }
   });
 
-  // Update portal
   app.put("/api/portals/:id", async (req, res) => {
     try {
       const storage = await getStorage();
-      const portalId = req.params.id;
-      const updates = req.body;
-      
-      const updatedPortal = await storage.updatePortal(portalId, updates);
+      const updatedPortal = await storage.updatePortal(req.params.id, req.body);
       res.json(updatedPortal);
     } catch (error) {
       console.error('Failed to update portal:', error);
@@ -123,22 +155,11 @@ export function registerRoutes(app: Express): void {
     }
   });
 
-  // PATCH portal (partial update)
   app.patch("/api/portals/:id", async (req, res) => {
     try {
       const storage = await getStorage();
-      // Decode URL-encoded portal ID (handles spaces and special characters)
       const portalId = decodeURIComponent(req.params.id);
-      const updates = req.body;
-      
-      const existingPortal = await storage.getPortal(portalId);
-      if (!existingPortal) {
-        return res.status(404).json({ message: "Portal not found" });
-      }
-      
-      // Apply partial updates and save to database
-      const updatedPortal = await storage.updatePortal(portalId, updates);
-      
+      const updatedPortal = await storage.updatePortal(portalId, req.body);
       res.json(updatedPortal);
     } catch (error) {
       console.error('Failed to patch portal:', error);
@@ -146,7 +167,6 @@ export function registerRoutes(app: Express): void {
     }
   });
 
-  // Get all game items
   app.get("/api/game-items", async (req, res) => {
     try {
       const storage = await getStorage();
@@ -157,7 +177,6 @@ export function registerRoutes(app: Express): void {
     }
   });
 
-  // Get all categories/indices
   app.get("/api/admin/categories", async (req, res) => {
     try {
       const storage = await getStorage();
@@ -168,7 +187,6 @@ export function registerRoutes(app: Express): void {
     }
   });
 
-  // Get specific game layout
   app.get("/api/layouts/:id", async (req, res) => {
     try {
       const storage = await getStorage();
@@ -182,12 +200,10 @@ export function registerRoutes(app: Express): void {
     }
   });
 
-  // Create new layout
   app.post("/api/layouts", async (req, res) => {
     try {
       const storage = await getStorage();
-      const layoutData = req.body;
-      const newLayout = await storage.createGameLayout(layoutData);
+      const newLayout = await storage.createGameLayout(req.body);
       res.status(201).json(newLayout);
     } catch (error) {
       console.error('Failed to create layout:', error);
@@ -195,26 +211,18 @@ export function registerRoutes(app: Express): void {
     }
   });
 
-  // Update layout (create if doesn't exist)
   app.put("/api/layouts/:id", async (req, res) => {
     try {
       const storage = await getStorage();
       const layoutId = req.params.id;
       const updates = req.body;
-      
-      // Check if layout exists
       const existingLayout = await storage.getGameLayout(layoutId);
       
       if (!existingLayout) {
-        // Create new layout
-        const newLayout = await storage.createGameLayout({
-          id: layoutId,
-          ...updates
-        });
+        const newLayout = await storage.createGameLayout({ id: layoutId, ...updates });
         return res.status(201).json(newLayout);
       }
       
-      // Update existing layout
       const updatedLayout = await storage.updateGameLayout(layoutId, updates);
       res.json(updatedLayout);
     } catch (error) {
@@ -223,7 +231,6 @@ export function registerRoutes(app: Express): void {
     }
   });
 
-  // Get user progress
   app.get("/api/progress", async (req, res) => {
     try {
       const storage = await getStorage();
@@ -234,7 +241,6 @@ export function registerRoutes(app: Express): void {
     }
   });
 
-  // Save user progress
   app.post("/api/progress", async (req, res) => {
     try {
       const storage = await getStorage();
@@ -249,7 +255,6 @@ export function registerRoutes(app: Express): void {
     }
   });
 
-  // Get game settings
   app.get("/api/settings", async (req, res) => {
     try {
       const storage = await getStorage();
@@ -260,7 +265,6 @@ export function registerRoutes(app: Express): void {
     }
   });
 
-  // Update game settings
   app.patch("/api/settings", async (req, res) => {
     try {
       const storage = await getStorage();
@@ -275,13 +279,10 @@ export function registerRoutes(app: Express): void {
     }
   });
 
-  // Generate dynamic game session
   app.get("/api/game-session/:portalId", async (req, res) => {
     try {
       const { portalId } = req.params;
-      // Decode URL-encoded portal ID (handles spaces and special characters)
       const decodedPortalId = decodeURIComponent(portalId);
-      console.log(`Original portalId: "${portalId}", Decoded: "${decodedPortalId}"`);
       const deviceType = (req.query.device as 'desktop' | 'mobile') || 'desktop';
       const gameMode = (req.query.mode as 'simple' | 'advanced') || 'simple';
       const variantId = req.query.variant as string | undefined;
@@ -290,82 +291,6 @@ export function registerRoutes(app: Express): void {
     } catch (error) {
       console.error('Error generating game session:', error);
       res.status(500).json({ error: 'Failed to generate game session' });
-    }
-  });
-
-  // Upload background image and generate variants
-  app.post("/api/upload/background", upload.single('background'), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ message: "No file uploaded" });
-      }
-
-      const portalId = req.body.portalId || 'd1';
-      const file = req.file;
-
-      // Create backgrounds directory if it doesn't exist
-      const backgroundsDir = join(process.cwd(), 'client', 'public', 'images', 'backgrounds');
-      if (!existsSync(backgroundsDir)) {
-        mkdirSync(backgroundsDir, { recursive: true });
-      }
-
-      // Generate unique filename based on original name
-      const baseName = parse(file.originalname).name;
-      const extension = extname(file.originalname);
-      const timestamp = Date.now();
-
-      // Desktop version (original size, max 1920x1080)
-      const desktopFileName = `${baseName}_${timestamp}_desktop${extension}`;
-      const desktopPath = join(backgroundsDir, desktopFileName);
-
-      // Mobile version (70% of desktop, max 1280x720)
-      const mobileFileName = `${baseName}_${timestamp}_mobile${extension}`;
-      const mobilePath = join(backgroundsDir, mobileFileName);
-
-      // Icon version (200x200)
-      const iconFileName = `${baseName}_${timestamp}_icon${extension}`;
-      const iconPath = join(backgroundsDir, iconFileName);
-
-      // Process images with sharp
-      const image = sharp(file.buffer);
-      const metadata = await image.metadata();
-
-      // Create desktop version (keep original aspect ratio, max 1920x1080)
-      await image
-        .resize(1920, 1080, { fit: 'inside', withoutEnlargement: true })
-        .jpeg({ quality: 90 })
-        .toFile(desktopPath);
-
-      // Create mobile version (70% of desktop size)
-      const mobileWidth = Math.round(metadata.width! * 0.7);
-      const mobileHeight = Math.round(metadata.height! * 0.7);
-      await sharp(file.buffer)
-        .resize(mobileWidth, mobileHeight, { fit: 'inside', withoutEnlargement: true })
-        .jpeg({ quality: 85 })
-        .toFile(mobilePath);
-
-      // Create icon version (200x200)
-      await sharp(file.buffer)
-        .resize(200, 200, { fit: 'cover' })
-        .jpeg({ quality: 80 })
-        .toFile(iconPath);
-
-      // Get final dimensions
-      const desktopMeta = await sharp(desktopPath).metadata();
-
-      res.json({
-        desktop: desktopFileName,
-        mobile: mobileFileName,
-        icon: iconFileName,
-        size: {
-          width: desktopMeta.width,
-          height: desktopMeta.height
-        }
-      });
-
-    } catch (error) {
-      console.error('Failed to upload background:', error);
-      res.status(500).json({ message: "Failed to upload background" });
     }
   });
 }

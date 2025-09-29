@@ -64,42 +64,6 @@ export default function Welcome({ onEnterGame, onOpenSettings, onGoToAdmin }: We
           </div>
         </div>
         
-        {/* Game Mode Selection */}
-        <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-6 animate-slide-up" style={{ animationDelay: "0.25s" }}>
-          <h3 className="text-white font-semibold text-lg mb-4 text-center">
-            Избери режим на играта
-          </h3>
-          <RadioGroup
-            value={selectedMode}
-            onValueChange={(value) => setSelectedMode(value as GameMode)}
-            className="space-y-3"
-          >
-            <div className="flex items-center space-x-3 p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
-              <RadioGroupItem value="simple" id="simple" />
-              <Label
-                htmlFor="simple"
-                className="flex-1 text-white cursor-pointer"
-              >
-                <div className="font-medium">Игра за мъници (2+)</div>
-                <div className="text-sm text-blue-100 opacity-80">
-                  Всички клетки са видими от началото
-                </div>
-              </Label>
-            </div>
-            <div className="flex items-center space-x-3 p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
-              <RadioGroupItem value="advanced" id="advanced" />
-              <Label
-                htmlFor="advanced"
-                className="flex-1 text-white cursor-pointer"
-              >
-                <div className="font-medium">Игра за малчугани (4+)</div>
-                <div className="text-sm text-blue-100 opacity-80">
-                  Клетките се показват последователно
-                </div>
-              </Label>
-            </div>
-          </RadioGroup>
-        </div>
         
         {/* Enter Button */}
         <Button
@@ -124,17 +88,6 @@ export default function Welcome({ onEnterGame, onOpenSettings, onGoToAdmin }: We
         <Settings className="w-6 h-6" />
       </Button>
 
-      {/* Admin Button */}
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={onGoToAdmin}
-        className="absolute top-4 left-4 w-12 h-12 bg-white/20 rounded-xl hover:bg-white/30 text-white"
-        data-testid="button-admin"
-        title="Админ панел"
-      >
-        <span className="text-lg">⚙️</span>
-      </Button>
     </div>
   );
 }

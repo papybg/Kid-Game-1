@@ -662,12 +662,18 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
         icon: localVersions.iconBlob?.size
       });
 
-      // Използваме сървърната логика като основна (по-надеждна)
+      // Добавяме всички версии към FormData
       const formData = new FormData();
-      formData.append('background', file);
+      formData.append('original', file);
+      if (localVersions.mobileBlob) {
+        formData.append('mobile', localVersions.mobileBlob, 'mobile_version.png');
+      }
+      if (localVersions.iconBlob) {
+        formData.append('icon', localVersions.iconBlob, 'icon_version.png');
+      }
       formData.append('portalId', portalId || 'd1');
 
-      const response = await fetch(apiPath('/api/upload/background'), {
+      const response = await fetch(apiPath('/api/upload/all'), {
         method: 'POST',
         body: formData
       });

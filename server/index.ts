@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { config } from "dotenv";
-import { registerRoutes } from "./routes";
+import { setupRoutes } from "./routes";
 import adminRoutes from "./adminRoutes";
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -17,8 +17,8 @@ app.use(express.urlencoded({ extended: false }));
 // За локална разработка, позволяваме заявки от Vite сървъра на порт 8080 и 8081
 app.use(cors({ origin: ['http://localhost:8080', 'http://localhost:8081'], credentials: true }));
 
-// registerRoutes вече не е async и не връща сървър. Просто добавя маршрутите.
-registerRoutes(app);
+// setupRoutes добавя всички API рутери
+setupRoutes(app);
 
 // Добави admin routes
 console.log('Setting up admin routes...');
