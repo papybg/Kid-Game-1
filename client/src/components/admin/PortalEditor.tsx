@@ -416,6 +416,11 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
           if (layout?.slots_desktop && Array.isArray(layout.slots_desktop)) {
             setDesktopSlots(layout.slots_desktop);
           }
+
+          // If portal contains variant settings, load them into local state so they can be edited
+          if (portal?.variantSettings) {
+            setVariantSettings(portal.variantSettings);
+          }
           
           // Load mobile slots if available (they will be scaled from desktop slots)
           // Mobile slots are computed from desktop slots with MOBILE_SIZE_SCALE

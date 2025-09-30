@@ -1,6 +1,6 @@
 import express from "express";
 import { createServer } from "http";
-import { registerRoutes } from "./routes.js";
+import { setupRoutes } from "./routes.js";
 import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -46,7 +46,7 @@ async function createProdServer() {
 
 async function start() {
   // Register API routes first
-  await registerRoutes(app);
+  await setupRoutes(app);
 
   // Then set up static/dev server
   const server = isProd ? await createProdServer() : await createDevServer();

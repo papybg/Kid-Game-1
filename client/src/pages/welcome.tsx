@@ -9,6 +9,7 @@ import { useSettingsStore, type GameMode } from "../lib/settings-store";
 interface WelcomeProps {
   onEnterGame: () => void;
   onOpenSettings: () => void;
+  onGoToAdmin?: () => void;
 }
 
 export default function Welcome({ onEnterGame, onOpenSettings }: WelcomeProps) {

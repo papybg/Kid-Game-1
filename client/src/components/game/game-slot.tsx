@@ -41,7 +41,7 @@ export function GameSlotComponent({ slot, isActive, isCompleted, placedItem, cla
       {placedItem && (
         <div className="absolute inset-0 p-2 flex items-center justify-center">
           <img
-            src={placedItem.image}
+            src={placedItem.image || ''}
             alt={placedItem.name}
             className="w-full h-full object-contain transform"
             style={{

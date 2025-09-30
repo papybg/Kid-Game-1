@@ -57,9 +57,12 @@ export function useGameState({ cells, items }: UseGameStateProps) {
   }, [cells, items]);
 
   React.useEffect(() => {
-    // Рестартираме играта само когато се смени 'cells' масива (т.е. зареди се ново ниво)
-    startGame();
-  }, [cells]);
+    // Рестартираме играта само когато се заредят нови клетки и налични предмети
+    // (избягваме стартиране при частично зареждане на данни)
+    if (cells && items) {
+      startGame();
+    }
+  }, [cells, items, startGame]);
 
   const startTurn = React.useCallback(() => {
     setGameState(prev => ({ ...prev, isPlaying: true }));
