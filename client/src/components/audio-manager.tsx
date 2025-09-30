@@ -145,4 +145,4 @@ export const useAudioContext = () => {
     throw new Error('useAudioContext must be used within an AudioProvider');
   }
   return context;
-};
+}; 

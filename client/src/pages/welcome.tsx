@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "../components/ui/button";
-import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
+// RadioGroupItem (Radix) requires a RadioGroup context; we use a decorative/focusable element instead
 import { Label } from "../components/ui/label";
 import { Settings, Play, Brain, Gamepad2, Smartphone, Volume2 } from "lucide-react";
 import { useAudioContext } from "../components/audio-manager";
@@ -10,9 +10,11 @@ interface WelcomeProps {
   onEnterGame: () => void;
   onOpenSettings: () => void;
   onGoToAdmin?: () => void;
+  onGoToUnderConstruction?: () => void;
+  onEnterPortals?: (variantId: string) => void;
 }
 
-export default function Welcome({ onEnterGame, onOpenSettings }: WelcomeProps) {
+export default function Welcome({ onEnterGame, onOpenSettings, onGoToUnderConstruction, onEnterPortals }: WelcomeProps) {
   const { initializeAudio, playSound } = useAudioContext();
   const { setGameMode } = useSettingsStore();
   const [selectedMode, setSelectedMode] = useState<GameMode>('advanced');
@@ -23,6 +25,21 @@ export default function Welcome({ onEnterGame, onOpenSettings }: WelcomeProps) {
 
     await initializeAudio();
     // Remove automatic start sound - let the game handle audio cues
+    onEnterGame();
+  };
+
+  const handleChoose = async (mode: GameMode) => {
+    setGameMode(mode);
+    await initializeAudio();
+    // If a direct portals handler is provided, use it with a variant mapping
+    if (mode === 'simple' && onEnterPortals) {
+      onEnterPortals('t1');
+      return;
+    }
+    if (mode === 'advanced' && onEnterPortals) {
+      onEnterPortals('k1');
+      return;
+    }
     onEnterGame();
   };
 
@@ -69,50 +86,55 @@ export default function Welcome({ onEnterGame, onOpenSettings }: WelcomeProps) {
           <h3 className="text-white font-semibold text-lg mb-4 text-center">
             Избери режим на играта
           </h3>
-          <RadioGroup
-            value={selectedMode}
-            onValueChange={(value) => setSelectedMode(value as GameMode)}
-            className="space-y-3"
-          >
-            <div className="flex items-center space-x-3 p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
-              <RadioGroupItem value="simple" id="simple" />
-              <Label
-                htmlFor="simple"
-                className="flex-1 text-white cursor-pointer"
+          <div className="space-y-3">
+            <div>
+              <Button
+                variant="ghost"
+                onClick={() => handleChoose('simple')}
+                className="w-full text-left p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-colors flex items-center gap-3"
               >
-                <div className="font-medium">Игра за мъници (2+)</div>
-                <div className="text-sm text-blue-100 opacity-80">
-                  Всички клетки са видими от началото
+                <span className="text-2xl" aria-hidden>{'👶'}</span>
+                <div className="flex-1 text-white">
+                  <div className="font-medium">Игра за мъници (2+)</div>
+                  <div className="text-sm text-blue-100 opacity-80">Всички клетки са видими от началото</div>
+                </div>
+              </Button>
+            </div>
+
+            <div>
+              <Button
+                variant="ghost"
+                onClick={() => handleChoose('advanced')}
+                className="w-full text-left p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-colors flex items-center gap-3"
+              >
+                <span className="text-2xl" aria-hidden>{'🧒'}</span>
+                <div className="flex-1 text-white">
+                  <div className="font-medium">Игра за малчугани (4+)</div>
+                  <div className="text-sm text-blue-100 opacity-80">Клетките се показват последователно</div>
+                </div>
+              </Button>
+            </div>
+
+            {/* batkovci remains a radio-like item that opens Under Construction */}
+            <div className="flex items-center space-x-3 p-3 rounded-xl bg-white/10 transition-colors">
+              <Label
+                htmlFor="batkovci"
+                className="flex-1 text-white cursor-pointer flex items-center gap-3"
+                onClick={() => {
+                  if (onGoToUnderConstruction) onGoToUnderConstruction();
+                }}
+              >
+                <span className="text-2xl" aria-hidden>{'🧑'}</span>
+                <div>
+                  <div className="font-medium">Игра за батковци</div>
+                  <div className="text-sm text-blue-100 opacity-80">Клетките се показват последователно</div>
                 </div>
               </Label>
             </div>
-            <div className="flex items-center space-x-3 p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
-              <RadioGroupItem value="advanced" id="advanced" />
-              <Label
-                htmlFor="advanced"
-                className="flex-1 text-white cursor-pointer"
-              >
-                <div className="font-medium">Игра за малчугани (4+)</div>
-                <div className="text-sm text-blue-100 opacity-80">
-                  Клетките се показват последователно
-                </div>
-              </Label>
-            </div>
-          </RadioGroup>
+          </div>
         </div>
-        
-        {/* Enter Button */}
-        <Button
-          onClick={handleEnterGame}
-          className="w-full bg-white text-blue-600 font-semibold py-4 px-8 rounded-2xl text-lg hover:bg-blue-50 transform hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl animate-slide-up"
-          style={{ animationDelay: "0.3s" }}
-          data-testid="button-enter-game"
-        >
-          <Play className="w-5 h-5 mr-2" />
-          ЗАПОЧНИ ИГРАТА
-        </Button>
       </div>
-      
+
       {/* Settings Button */}
       <Button
         variant="ghost"

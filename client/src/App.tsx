@@ -12,10 +12,11 @@ import PortalSelection from "./pages/portal-selection";
 import Game from "./pages/game";
 import Win from "./pages/win";
 import AdminPage from "./pages/admin";
+import UnderConstruction from "./pages/under-construction";
 
 import type { Portal, GameVariant } from "@shared/schema";
 
-type Screen = "welcome" | "variants" | "portals" | "game" | "win" | "admin";
+type Screen = "welcome" | "variants" | "portals" | "game" | "win" | "admin" | "under";
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>("welcome");
@@ -47,6 +48,14 @@ function App() {
 
   const handleEnterGame = () => {
     setCurrentScreen("variants");
+  };
+
+  // New: directly open portals for a variant (used by welcome buttons)
+  const handleEnterPortals = (variantId: string) => {
+    // Create a minimal variant object so downstream components can use it
+    const dummyVariant = { id: variantId, displayName: variantId, description: '' } as GameVariant;
+    setSelectedVariant(dummyVariant);
+    setCurrentScreen('portals');
   };
 
   const handleBackToWelcome = () => {
@@ -114,15 +123,12 @@ function App() {
                   onEnterGame={handleEnterGame}
                   onOpenSettings={handleOpenSettings}
                   onGoToAdmin={handleGoToAdmin}
+                  onGoToUnderConstruction={() => setCurrentScreen('under')}
+                  onEnterPortals={handleEnterPortals}
                 />
               )}
               
-              {currentScreen === "variants" && (
-                <VariantSelection
-                  onSelectVariant={handleSelectVariant}
-                  onBackToWelcome={handleBackToWelcome}
-                />
-              )}
+              {/* variants screen removed: direct navigation to portals is used */}
               
               {currentScreen === "portals" && (
                 <PortalSelection
@@ -151,6 +157,9 @@ function App() {
 
               {currentScreen === "admin" && (
                 <AdminPage />
+              )}
+              {currentScreen === "under" && (
+                <UnderConstruction onBack={() => setCurrentScreen('welcome')} />
               )}
             </div>
             
