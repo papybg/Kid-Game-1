@@ -19,9 +19,9 @@ const storage = multer.diskStorage({
     }
   },
   filename: (req, file, cb) => {
-    // Генерирай уникално име: timestamp + оригинално име
-    const uniqueName = Date.now() + '-' + file.originalname;
-    cb(null, uniqueName);
+    // Използвай само оригиналното име на файла без timestamp
+    const cleanName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_'); // Почисти специални символи
+    cb(null, cleanName);
   }
 });
 

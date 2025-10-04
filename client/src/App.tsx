@@ -10,6 +10,7 @@ import Welcome from "./pages/welcome";
 import VariantSelection from "./pages/variant-selection";
 import PortalSelection from "./pages/portal-selection";
 import Game from "./pages/game";
+import GameT1 from "./pages/game-t1";
 import Win from "./pages/win";
 import AdminPage from "./pages/admin";
 import UnderConstruction from "./pages/under-construction";
@@ -138,13 +139,23 @@ function App() {
               )}
               
               {currentScreen === "game" && selectedPortal && selectedVariant && (
-                <Game
-                  key={gameKey}
-                  portalId={selectedPortal.id}
-                  variantId={selectedVariant.id}
-                  onBackToMenu={handleBackToMenu}
-                  onWin={handleWin}
-                />
+                selectedVariant.id === 't1' ? (
+                  <GameT1
+                    key={gameKey}
+                    portalId={selectedPortal.id}
+                    variantId={selectedVariant.id}
+                    onBackToMenu={handleBackToMenu}
+                    onComplete={handleWin}
+                  />
+                ) : (
+                  <Game
+                    key={gameKey}
+                    portalId={selectedPortal.id}
+                    variantId={selectedVariant.id}
+                    onBackToMenu={handleBackToMenu}
+                    onWin={handleWin}
+                  />
+                )
               )}
               
               {currentScreen === "win" && (

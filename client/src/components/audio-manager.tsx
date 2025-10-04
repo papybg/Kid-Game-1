@@ -91,17 +91,37 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
 
   const playItemSound = (item: GameItem, delay?: number): HTMLAudioElement | null => {
     if (!isInitialized || !soundEnabled || !item.audio) return null;
+    console.log('playItemSound called with:', item.name, 'audio:', item.audio, 'delay:', delay);
 
     let audio: HTMLAudioElement | null = null;
     const play = () => {
+      console.log('Creating new Audio object for:', item.audio);
       const sound = new Audio(item.audio!); // Разчитаме на данните от базата
       sound.volume = 0.7;
       
-      sound.addEventListener('play', () => { stopCurrentAudio(); setIsAudioPlaying(true); currentAudioRef.current = sound; });
-      sound.addEventListener('ended', () => { setIsAudioPlaying(false); currentAudioRef.current = null; });
-      sound.addEventListener('error', () => { setIsAudioPlaying(false); currentAudioRef.current = null; });
+      sound.addEventListener('play', () => { 
+        console.log('Audio play event for:', item.name);
+        stopCurrentAudio(); 
+        setIsAudioPlaying(true); 
+        currentAudioRef.current = sound; 
+      });
+      sound.addEventListener('ended', () => { 
+        console.log('Audio ended event for:', item.name);
+        setIsAudioPlaying(false); 
+        currentAudioRef.current = null; 
+      });
+      sound.addEventListener('error', (e) => { 
+        console.log('Audio error for:', item.name, e);
+        setIsAudioPlaying(false); 
+        currentAudioRef.current = null; 
+      });
       
-      sound.play().catch(() => playTone(300, 0.3));
+      sound.play().then(() => {
+        console.log('Audio play() promise resolved for:', item.name);
+      }).catch((e) => {
+        console.log('Audio play() failed for:', item.name, e);
+        playTone(300, 0.3);
+      });
       audio = sound;
     };
 

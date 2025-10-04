@@ -140,6 +140,7 @@ export type InsertGameVariant = z.infer<typeof insertGameVariantSchema>;
 
 // Game-specific types
 export interface GameSlot {
+  id?: string; // Optional for backward compatibility
   index: string[];
   position: { top: string; left: string };
   diameter: string;
@@ -174,4 +175,5 @@ export interface GameSession {
   items: GameItem[];
   levelType: 'equals_cells' | 'cells_plus_two';
   layout: GameLayout;
+  solution?: Record<number, string>; // For T1 mode: { itemId: cellId }
 }

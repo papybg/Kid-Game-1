@@ -17,22 +17,31 @@ function selectRandom<T>(array: T[], count: number): T[] {
   return shuffled.slice(0, count);
 }
 
-// Helper function to check if item can go in slot (hierarchical matching)
-function canItemGoInSlot(itemIndex: string, slotIndices: string[]): boolean {
-  // Check exact match first
-  if (slotIndices.includes(itemIndex)) {
-    return true;
+// Helper function to get priority score for item-slot matching
+function getMatchPriority(itemIndex: string, slotIndices: string[]): number {
+  // Priority 1: Exact match with first index
+  if (slotIndices.length > 0 && itemIndex === slotIndices[0]) {
+    return 1;
   }
-
-  // Check hierarchical match: item can go in parent category slot
-  // e.g., "rp" (firetruck) can go in "r" (transport) slot
-  for (const slotIndex of slotIndices) {
-    if (itemIndex.startsWith(slotIndex)) {
-      return true;
+  
+  // Priority 2: Exact match with second index (if exists)
+  if (slotIndices.length > 1 && itemIndex === slotIndices[1]) {
+    return 2;
+  }
+  
+  // Priority 3: Hierarchical match (item starts with slot index)
+  for (let i = 0; i < slotIndices.length; i++) {
+    if (itemIndex.startsWith(slotIndices[i])) {
+      return 3 + i; // 3 for first slot, 4 for second slot
     }
   }
+  
+  return 0; // No match
+}
 
-  return false;
+// Helper function to check if item can go in slot (hierarchical matching)
+function canItemGoInSlot(itemIndex: string, slotIndices: string[]): boolean {
+  return getMatchPriority(itemIndex, slotIndices) > 0;
 }
 
 // Интерфейсите остават същите...
@@ -45,6 +54,7 @@ export interface GameSession {
   items: Item[];
   levelType: 'equals_cells' | 'cells_plus_two';
   layout: Layout;
+  solution?: Record<number, string>; // For T1 mode: { itemId: cellId }
 }
 
 export async function generateGameSession(portalId: string, deviceType: 'desktop' | 'mobile' = 'desktop', gameMode: 'simple' | 'advanced' = 'simple', variantId?: string): Promise<GameSession> {
@@ -127,31 +137,63 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
 
   const selectedCells = selectRandom(validSlots, finalCellCount);
 
+  // Sort cells by complexity: cells with 2+ letter indices first, then cells with only 1-letter indices
+  const sortedCells = [...selectedCells].sort((a, b) => {
+    const aHasMultiLetter = a.index.some(idx => idx.length >= 2);
+    const bHasMultiLetter = b.index.some(idx => idx.length >= 2);
+    
+    // Cells with multi-letter indices come first
+    if (aHasMultiLetter && !bHasMultiLetter) return -1;
+    if (!aHasMultiLetter && bHasMultiLetter) return 1;
+    return 0;
+  });
+
   // Get items for selected cells (using hierarchical matching)
   const correctItemsPool = allItems.filter(item => 
     item.index !== 'js' && selectedCells.some(cell => canItemGoInSlot(item.index, cell.index))
   );
 
-  // Select correct items for each cell (guaranteed to have at least one per cell)
+  // Select correct items for each cell with priority matching (process sorted cells)
   const selectedCorrectItems: Item[] = [];
   const usedItemIds = new Set<number>();
+  const usedIndices = new Set<string>(); // Track used indices to prevent duplicates
 
-  for (const cell of selectedCells) {
-    const matchingItems = correctItemsPool.filter(item =>
-      canItemGoInSlot(item.index, cell.index) && !usedItemIds.has(item.id)
-    );
+  for (const cell of sortedCells) {
+    const hasMultiLetterIndex = cell.index.some(idx => idx.length >= 2);
+    
+    if (hasMultiLetterIndex) {
+      // For cells with 2+ letter indices, use the existing priority logic
+      const candidateItems = correctItemsPool
+        .filter(item => !usedItemIds.has(item.id) && !usedIndices.has(item.index))
+        .map(item => ({
+          item,
+          priority: getMatchPriority(item.index, cell.index)
+        }))
+        .filter(candidate => candidate.priority > 0)
+        .sort((a, b) => a.priority - b.priority);
 
-    if (matchingItems.length > 0) {
-      const randomItem = selectRandom(matchingItems, 1)[0];
-      selectedCorrectItems.push(randomItem);
-      usedItemIds.add(randomItem.id);
+      if (candidateItems.length > 0) {
+        const bestPriority = candidateItems[0].priority;
+        const bestCandidates = candidateItems.filter(c => c.priority === bestPriority);
+        const selectedCandidate = selectRandom(bestCandidates, 1)[0];
+        selectedCorrectItems.push(selectedCandidate.item);
+        usedItemIds.add(selectedCandidate.item.id);
+        usedIndices.add(selectedCandidate.item.index);
+      }
     } else {
-      // Fallback: allow reusing items if we run out
-      const fallbackItems = correctItemsPool.filter(item => canItemGoInSlot(item.index, cell.index) && !usedItemIds.has(item.id));
-      if (fallbackItems.length > 0) {
-        const randomItem = selectRandom(fallbackItems, 1)[0];
-        selectedCorrectItems.push(randomItem);
-        usedItemIds.add(randomItem.id);
+      // For cells with only 1-letter indices, choose from all remaining items that match first letter
+      const availableItems = allItems.filter(item => 
+        item.index !== 'js' && 
+        !usedItemIds.has(item.id) &&
+        !usedIndices.has(item.index) &&
+        cell.index.some(cellIdx => item.index.startsWith(cellIdx))
+      );
+      
+      if (availableItems.length > 0) {
+        const selectedItem = selectRandom(availableItems, 1)[0];
+        selectedCorrectItems.push(selectedItem);
+        usedItemIds.add(selectedItem.id);
+        usedIndices.add(selectedItem.index);
       }
     }
   }
@@ -174,16 +216,21 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
   const totalItemCount = gameMode === 'advanced' ? 8 : 6;
   const neededConfusing = Math.max(0, totalItemCount - selectedCorrectItems.length);
 
-  // Add confusing items from remaining items (exclude joker items and already used items)
+  // Add confusing items from remaining items (exclude joker items, already used items, and used indices)
   let confusingItems: Item[] = [];
   if (neededConfusing > 0) {
     const availableConfusingItems = allItems.filter(item =>
-      !usedItemIds.has(item.id) && item.index !== 'js'
+      !usedItemIds.has(item.id) && 
+      item.index !== 'js' &&
+      !usedIndices.has(item.index) // Don't add items with same index as correct items
     );
     const selectedConfusing = selectRandom(availableConfusingItems, Math.min(neededConfusing, availableConfusingItems.length));
     confusingItems = selectedConfusing;
     // Add to used items
-    selectedConfusing.forEach(item => usedItemIds.add(item.id));
+    selectedConfusing.forEach(item => {
+      usedItemIds.add(item.id);
+      usedIndices.add(item.index);
+    });
   }
 
   // Combine all items
@@ -209,6 +256,19 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
   }
 
   const shuffledItems = shuffleArray(finalItems);
+
+  // Create solution mapping for T1 tutorial mode
+  let solutionMapping: Record<number, string> | undefined;
+  if (variantId === 't1') {
+    solutionMapping = {};
+    // Map each correct item to its corresponding cell
+    for (let i = 0; i < selectedCorrectItems.length && i < sortedCells.length; i++) {
+      const item = selectedCorrectItems[i];
+      const cell = sortedCells[i];
+      // TypeScript doesn't know about id, but it exists in runtime
+      solutionMapping[item.id] = (cell as any).id;
+    }
+  }
 
   // Ако все още няма достатъчно предмети, добави уникални тестови обекти
   if (shuffledItems.length < totalItemCount) {
@@ -240,5 +300,6 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
     items: shuffledItems,
     levelType: levelType,
     layout: layout,
+    solution: solutionMapping,
   };
 }
