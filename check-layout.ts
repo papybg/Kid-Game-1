@@ -1,5 +1,5 @@
-import { db } from './server/db.js';
-import { gameLayouts, gameItems } from './shared/schema.js';
+import { db } from './server/db';
+import { gameLayouts, gameItems } from './shared/schema';
 import { eq, inArray } from 'drizzle-orm';
 
 async function checkLayout(layoutId: string) {
@@ -68,7 +68,5 @@ async function checkLayout(layoutId: string) {
 const layoutIdToCheck = process.argv[2] || 'd2';
 
 checkLayout(layoutIdToCheck).finally(() => {
-  // Затваряме връзката с базата данни, когато скриптът приключи
-  const client = db.query.portals.findFirst().session.client;
-  client.end();
+  process.exit(0);
 });

@@ -5,6 +5,7 @@ import { Toaster } from "./components/ui/toaster";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { ThemeProvider } from "./components/theme-provider";
 import { AudioProvider } from "./components/audio-manager";
+import { SettingsModal } from "./components/settings-modal";
 
 import Welcome from "./pages/welcome";
 import VariantSelection from "./pages/variant-selection";
@@ -183,7 +184,7 @@ function App() {
               )}
             </div>
             
-            {/* TODO: Add Settings Modal */}
+            <SettingsModal />
             
             <Toaster />
           </TooltipProvider>
