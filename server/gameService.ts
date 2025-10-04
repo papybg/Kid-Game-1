@@ -17,31 +17,57 @@ function selectRandom<T>(array: T[], count: number): T[] {
   return shuffled.slice(0, count);
 }
 
-// Helper function to get priority score for item-slot matching
-function getMatchPriority(itemIndex: string, slotIndices: string[]): number {
-  // Priority 1: Exact match with first index
-  if (slotIndices.length > 0 && itemIndex === slotIndices[0]) {
+// Helper function to determine cell type for sorting priority
+function getCellType(cellIndex: string[]): number {
+  const indexStr = cellIndex.join(',');
+  
+  // Type 1: Double index (e.g., "sa", "ra")
+  if (cellIndex.length === 1 && cellIndex[0].length === 2) {
     return 1;
   }
   
-  // Priority 2: Exact match with second index (if exists)
-  if (slotIndices.length > 1 && itemIndex === slotIndices[1]) {
+  // Type 2: Single index (e.g., "r", "h", "p")
+  if (cellIndex.length === 1 && cellIndex[0].length === 1) {
     return 2;
   }
   
-  // Priority 3: Hierarchical match (item starts with slot index)
-  for (let i = 0; i < slotIndices.length; i++) {
-    if (itemIndex.startsWith(slotIndices[i])) {
-      return 3 + i; // 3 for first slot, 4 for second slot
-    }
+  // Type 3: Two single indices (e.g., "p,h", "h,p")
+  if (cellIndex.length === 2 && cellIndex.every(idx => idx.length === 1)) {
+    return 3;
   }
   
-  return 0; // No match
+  return 4; // Unknown type
 }
 
-// Helper function to check if item can go in slot (hierarchical matching)
+// Helper function to find best matching item for a cell
+function findBestItemForCell(cellIndex: string[], availableItems: any[]): any | null {
+  const indexStr = cellIndex.join(',');
+  
+  // Double index - exact match only
+  if (cellIndex.length === 1 && cellIndex[0].length === 2) {
+    return availableItems.find(item => item.index === cellIndex[0]) || null;
+  }
+  
+  // Single index - hierarchical match (item starts with cell index)
+  if (cellIndex.length === 1 && cellIndex[0].length === 1) {
+    return availableItems.find(item => item.index.startsWith(cellIndex[0])) || null;
+  }
+  
+  // Two indices - priority on first, fallback to second
+  if (cellIndex.length === 2) {
+    const firstMatch = availableItems.find(item => item.index === cellIndex[0]);
+    if (firstMatch) return firstMatch;
+    
+    const secondMatch = availableItems.find(item => item.index === cellIndex[1]);
+    if (secondMatch) return secondMatch;
+  }
+  
+  return null;
+}
+
+// Helper function to check if item can go in slot (simple compatibility check)
 function canItemGoInSlot(itemIndex: string, slotIndices: string[]): boolean {
-  return getMatchPriority(itemIndex, slotIndices) > 0;
+  return findBestItemForCell(slotIndices, [{ index: itemIndex }]) !== null;
 }
 
 // Интерфейсите остават същите...
@@ -66,6 +92,9 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
   let variantSettings: { minCells: number; maxCells: number; hasExtraItems: boolean } | null = null;
   if (variantId && portal.variantSettings) {
     variantSettings = portal.variantSettings[variantId];
+    console.log(`[GameService] Using variant settings for ${variantId}:`, variantSettings);
+  } else {
+    console.log(`[GameService] No variant settings found. variantId: ${variantId}, portal.variantSettings:`, portal.variantSettings);
   }
 
   const layout = await db.query.gameLayouts.findFirst({ where: eq(gameLayouts.id, portal.layouts[0]) });
@@ -137,15 +166,11 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
 
   const selectedCells = selectRandom(validSlots, finalCellCount);
 
-  // Sort cells by complexity: cells with 2+ letter indices first, then cells with only 1-letter indices
+  // Sort cells by priority: double index -> single index -> two indices
   const sortedCells = [...selectedCells].sort((a, b) => {
-    const aHasMultiLetter = a.index.some(idx => idx.length >= 2);
-    const bHasMultiLetter = b.index.some(idx => idx.length >= 2);
-    
-    // Cells with multi-letter indices come first
-    if (aHasMultiLetter && !bHasMultiLetter) return -1;
-    if (!aHasMultiLetter && bHasMultiLetter) return 1;
-    return 0;
+    const aType = getCellType(a.index);
+    const bType = getCellType(b.index);
+    return aType - bType;
   });
 
   // Get items for selected cells (using hierarchical matching)
@@ -153,48 +178,20 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
     item.index !== 'js' && selectedCells.some(cell => canItemGoInSlot(item.index, cell.index))
   );
 
-  // Select correct items for each cell with priority matching (process sorted cells)
+  // Select correct items for each cell using new logical matching
   const selectedCorrectItems: Item[] = [];
   const usedItemIds = new Set<number>();
-  const usedIndices = new Set<string>(); // Track used indices to prevent duplicates
 
   for (const cell of sortedCells) {
-    const hasMultiLetterIndex = cell.index.some(idx => idx.length >= 2);
+    // Find available items (not yet used)
+    const availableItems = correctItemsPool.filter(item => !usedItemIds.has(item.id));
     
-    if (hasMultiLetterIndex) {
-      // For cells with 2+ letter indices, use the existing priority logic
-      const candidateItems = correctItemsPool
-        .filter(item => !usedItemIds.has(item.id) && !usedIndices.has(item.index))
-        .map(item => ({
-          item,
-          priority: getMatchPriority(item.index, cell.index)
-        }))
-        .filter(candidate => candidate.priority > 0)
-        .sort((a, b) => a.priority - b.priority);
-
-      if (candidateItems.length > 0) {
-        const bestPriority = candidateItems[0].priority;
-        const bestCandidates = candidateItems.filter(c => c.priority === bestPriority);
-        const selectedCandidate = selectRandom(bestCandidates, 1)[0];
-        selectedCorrectItems.push(selectedCandidate.item);
-        usedItemIds.add(selectedCandidate.item.id);
-        usedIndices.add(selectedCandidate.item.index);
-      }
-    } else {
-      // For cells with only 1-letter indices, choose from all remaining items that match first letter
-      const availableItems = allItems.filter(item => 
-        item.index !== 'js' && 
-        !usedItemIds.has(item.id) &&
-        !usedIndices.has(item.index) &&
-        cell.index.some(cellIdx => item.index.startsWith(cellIdx))
-      );
-      
-      if (availableItems.length > 0) {
-        const selectedItem = selectRandom(availableItems, 1)[0];
-        selectedCorrectItems.push(selectedItem);
-        usedItemIds.add(selectedItem.id);
-        usedIndices.add(selectedItem.index);
-      }
+    // Find best matching item for this cell
+    const bestItem = findBestItemForCell(cell.index, availableItems);
+    
+    if (bestItem) {
+      selectedCorrectItems.push(bestItem);
+      usedItemIds.add(bestItem.id);
     }
   }
 
@@ -216,20 +213,18 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
   const totalItemCount = gameMode === 'advanced' ? 8 : 6;
   const neededConfusing = Math.max(0, totalItemCount - selectedCorrectItems.length);
 
-  // Add confusing items from remaining items (exclude joker items, already used items, and used indices)
+  // Add confusing items from remaining items (exclude joker items and already used items)
   let confusingItems: Item[] = [];
   if (neededConfusing > 0) {
     const availableConfusingItems = allItems.filter(item =>
       !usedItemIds.has(item.id) && 
-      item.index !== 'js' &&
-      !usedIndices.has(item.index) // Don't add items with same index as correct items
+      item.index !== 'js'
     );
     const selectedConfusing = selectRandom(availableConfusingItems, Math.min(neededConfusing, availableConfusingItems.length));
     confusingItems = selectedConfusing;
     // Add to used items
     selectedConfusing.forEach(item => {
       usedItemIds.add(item.id);
-      usedIndices.add(item.index);
     });
   }
 

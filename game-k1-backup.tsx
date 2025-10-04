@@ -10,47 +10,31 @@ import { useAudioContext } from "../components/audio-manager";
 import { fetchGameSession } from "../lib/api";
 import type { GameItem, GameSlot as Slot, GameSession } from "@shared/schema";
 
-interface GameT1Props {
+interface GameK1Props {
   portalId: string;
-  variantId: string; // Always 't1' for this component
+  variantId: string; // Always 'k1' for this component
   onBackToMenu: () => void;
   onComplete: () => void;
 }
 
 type GamePhase = 'start' | 'playing' | 'complete';
 
-export default function GameT1({ portalId, variantId, onBackToMenu, onComplete }: GameT1Props) {
+export default function GameK1({ portalId, variantId, onBackToMenu, onComplete }: GameK1Props) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [gamePhase, setGamePhase] = useState<'playing' | 'complete'>('playing'); // Start directly in playing phase
-  const [selectedItem, setSelectedItem] = useState<GameItem | null>(null);
-  const [placedItems, setPlacedItems] = useState<Record<string, GameItem>>({}); // cellId -> item
+  const [gamePhase, setGamePhase] = useState<GamePhase>('start');
+  const [activeSlotIndex, setActiveSlotIndex] = useState<number>(0); // Index of currently active slot
+  const [placedItems, setPlacedItems] = useState<Record<string, GameItem>>({}); // slotId -> item
   const [completedItems, setCompletedItems] = useState<Set<number>>(new Set());
   const [feedbackMessage, setFeedbackMessage] = useState<string>('');
   const [showFeedback, setShowFeedback] = useState(false);
   
-  const { soundEnabled, setSoundEnabled, playSound, playVoice, playItemSound, isAudioPlaying, getSoundFile } = useAudioContext();
+  const { soundEnabled, setSoundEnabled, playSound, playItemSound, isAudioPlaying, getSoundFile } = useAudioContext();
   
   const { data: gameSession, isLoading: sessionLoading, error: sessionError } = useQuery({
-    queryKey: ['gameSessionT1', portalId, isMobile ? 'mobile' : 'desktop', variantId],
+    queryKey: ['gameSessionK1', portalId, isMobile ? 'mobile' : 'desktop', variantId],
     queryFn: () => fetchGameSession(portalId, isMobile ? 'mobile' : 'desktop', 'simple', variantId),
     enabled: !!portalId,
   });
-
-  // Request fullscreen when component mounts
-  useEffect(() => {
-    const requestFullscreen = async () => {
-      try {
-        if (document.documentElement.requestFullscreen) {
-          await document.documentElement.requestFullscreen();
-        }
-      } catch (error) {
-        console.log('Fullscreen request failed:', error);
-      }
-    };
-    
-    requestFullscreen();
-    displayFeedback('Избери обект!', 3000);
-  }, []);
 
   // Handle window resize
   useEffect(() => {
@@ -68,111 +52,121 @@ export default function GameT1({ portalId, variantId, onBackToMenu, onComplete }
   const handleStartGame = () => {
     playSound('click');
     setGamePhase('playing');
-    displayFeedback('Избери обект!');
+    displayFeedback('Избери обект за първата клетка!', 3000);
+  };
+
+  // K1 Logic: Check if item can be placed in currently active slot
+  const canPlaceItemInActiveSlot = (item: GameItem): { canPlace: boolean; reason?: string } => {
+    if (!gameSession?.cells || activeSlotIndex >= gameSession.cells.length) {
+      return { canPlace: false, reason: 'Няма активна клетка' };
+    }
+
+    const activeSlot = gameSession.cells[activeSlotIndex];
+    const itemIndex = item.index || '';
+    const slotIndices = activeSlot.index || [];
+
+    // Get first letter of item
+    const itemFirstLetter = itemIndex.charAt(0);
+    
+    // Check if first letter matches any slot index
+    const hasFirstLetterMatch = slotIndices.some(slotIdx => slotIdx.charAt(0) === itemFirstLetter);
+    
+    if (!hasFirstLetterMatch) {
+      return { canPlace: false, reason: 'Първата буква не съвпада' };
+    }
+
+    // If item has only one letter, accept it
+    if (itemIndex.length === 1) {
+      return { canPlace: true };
+    }
+
+    // If item has two letters, check for exact match first
+    const hasExactMatch = slotIndices.includes(itemIndex);
+    if (hasExactMatch) {
+      return { canPlace: true };
+    }
+
+    // If no exact match, check if there's another slot with exact match for this item
+    const hasOtherExactMatch = gameSession.cells.some((slot, index) => 
+      index !== activeSlotIndex && slot.index.includes(itemIndex)
+    );
+
+    if (hasOtherExactMatch) {
+      return { canPlace: false, reason: 'Има по-подходяща клетка за този обект' };
+    }
+
+    // If no other exact match exists, accept based on first letter
+    return { canPlace: true };
   };
 
   const handleItemClick = (item: GameItem) => {
-    if (isAudioPlaying || completedItems.has(item.id) || !gameSession?.solution || gamePhase !== 'playing') return;
+    if (isAudioPlaying || completedItems.has(item.id) || gamePhase !== 'playing') return;
     
-    console.log('Item clicked:', item.name);
+    const { canPlace, reason } = canPlaceItemInActiveSlot(item);
     
-    // If this item is already selected, place it
-    if (selectedItem?.id === item.id) {
-      playSound('click');
-      // Place item in correct cell immediately
-      if (gameSession.solution) {
-        const targetCellId = gameSession.solution[item.id];
-        if (targetCellId) {
-          placeItemInCell(item, targetCellId);
-        }
-      }
-    } else {
-      // First click - just select the item
-      playSound('click');
-      setSelectedItem(item);
-      displayFeedback('Къде ми е мястото?');
-    }
-  };
-
-  const placeItemInCell = (item: GameItem, cellId: string) => {
-    console.log('Placing item:', item.name, 'in cell:', cellId);
-    
-    const targetCell = gameSession?.cells.find((cell: any) => cell.id === cellId);
-    if (!targetCell) {
-      console.error('Target cell not found:', cellId);
+    if (!canPlace) {
+      playSound('error');
+      displayFeedback(reason || 'Не може да се постави тук!');
       return;
     }
-    
-    const slotId = `${targetCell.position.top}-${targetCell.position.left}`;
-    
-    setPlacedItems(prev => ({ ...prev, [slotId]: item }));
-    setSelectedItem(null);
-    
-    // Веднага маркирай като завършен и провери
-    setCompletedItems(prev => {
-      const newCompleted = new Set([...prev, item.id]);
-      console.log('Completed items updated:', Array.from(newCompleted));
-      
-      // Провери дали всички предмети от решението са завършени
-      const allCompleted = gameSession?.solution && 
-        Object.keys(gameSession.solution).every(itemId => 
-          newCompleted.has(parseInt(itemId))
-        );
-      
-      if (allCompleted) {
-        console.log('ALL ITEMS COMPLETED - PLAYING FINAL AUDIO');
-        
-        // Пусни звука на последния предмет
-        const itemAudio = playItemSound(item, 0);
-        
-        if (itemAudio) {
-          // Когато звукът на предмета свърши, пусни win sound и покажи Game Over
-          itemAudio.onended = () => {
-            console.log('Final item audio ended - showing game complete');
-            
-            // Пусни win sound
-            const winSound = getSoundFile('win');
-            if (winSound) {
-              winSound.play();
-            }
-            
-            // Покажи Game Over екрана
-            setGamePhase('complete');
-          };
-        } else {
-          // Fallback без audio - директно към Game Over
-          console.log('No audio for final item - showing game complete immediately');
-          
-          // Пусни win sound
-          const winSound = getSoundFile('win');
-          if (winSound) {
-            winSound.play();
-          }
-          
-          setTimeout(() => setGamePhase('complete'), 500);
-        }
-      } else {
-        // Не е последният предмет - просто пусни звука
-        playItemSound(item, 0);
-      }
-      
-      return newCompleted;
-    });
+
+    // Place item in active slot
+    placeItemInActiveSlot(item);
   };
 
-  // Simplified win effect - just wait for game complete phase
-  useEffect(() => {
-    if (gamePhase === 'complete') {
-      console.log('Game complete phase activated - showing win screen');
-      
-      const timer = setTimeout(() => {
-        console.log('Calling onComplete after delay');
-        onComplete();
-      }, 4000); // По-дълъг delay за да се чуе win sound-а
-      
-      return () => clearTimeout(timer);
+  const placeItemInActiveSlot = (item: GameItem) => {
+    if (!gameSession?.cells || activeSlotIndex >= gameSession.cells.length) return;
+
+    const activeSlot = gameSession.cells[activeSlotIndex];
+    const slotId = `${activeSlot.position.top}-${activeSlot.position.left}`;
+    
+    // Place item in active slot
+    setPlacedItems(prev => ({ ...prev, [slotId]: item }));
+    setCompletedItems(prev => new Set([...prev, item.id]));
+    
+    // Play item sound
+    const itemAudio = playItemSound(item, 0);
+    
+    if (itemAudio) {
+      itemAudio.onended = () => {
+        moveToNextSlot();
+      };
+    } else {
+      // Fallback if no audio
+      setTimeout(() => {
+        moveToNextSlot();
+      }, 1000);
     }
-  }, [gamePhase, onComplete]);
+  };
+
+  const moveToNextSlot = () => {
+    if (!gameSession?.cells) return;
+
+    const nextIndex = activeSlotIndex + 1;
+    
+    if (nextIndex >= gameSession.cells.length) {
+      // Game complete
+      setTimeout(() => {
+        setGamePhase('complete');
+        displayFeedback('Браво! Играта завърши!', 3000);
+        
+        // Use win sound file like in main game
+        const winSound = getSoundFile('win');
+        if (winSound) {
+          winSound.onended = () => {
+            setTimeout(() => onComplete(), 500);
+          };
+          winSound.play();
+        } else {
+          setTimeout(() => onComplete(), 2000);
+        }
+      }, 500);
+    } else {
+      // Move to next slot
+      setActiveSlotIndex(nextIndex);
+      displayFeedback(`Избери обект за клетка ${nextIndex + 1}!`);
+    }
+  };
 
   if (sessionLoading) {
     return (
@@ -233,19 +227,37 @@ export default function GameT1({ portalId, variantId, onBackToMenu, onComplete }
 
       {/* Game Area */}
       <div className="relative z-10 w-full h-full">
+        {gamePhase === 'start' && (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <h1 className="text-4xl font-bold text-white mb-8 drop-shadow-lg">
+                K1 Mode - Последователно запълване
+              </h1>
+              <Button
+                size="lg"
+                onClick={handleStartGame}
+                className="bg-green-500 hover:bg-green-600 text-white text-xl px-8 py-4"
+              >
+                Старт
+              </Button>
+            </div>
+          </div>
+        )}
+
         {gamePhase === 'playing' && (
           <>
             {/* Game Slots */}
             <div className="absolute inset-0">
-              {availableCells.map((slot) => {
+              {availableCells.map((slot, index) => {
                 const slotId = `${slot.position.top}-${slot.position.left}`;
                 const placedItem = placedItems[slotId];
+                const isActive = index === activeSlotIndex;
                 return (
                   <GameSlotComponent
                     key={slotId}
                     slot={slot}
                     placedItem={placedItem}
-                    isActive={false}
+                    isActive={isActive}
                     isCompleted={!!placedItem}
                   />
                 );
@@ -260,7 +272,7 @@ export default function GameT1({ portalId, variantId, onBackToMenu, onComplete }
                     <ChoiceItem
                       key={item.id}
                       item={item}
-                      isSelected={selectedItem?.id === item.id}
+                      isSelected={false}
                       isDisabled={isAudioPlaying}
                       onClick={() => handleItemClick(item)}
                     />
@@ -276,8 +288,14 @@ export default function GameT1({ portalId, variantId, onBackToMenu, onComplete }
             <div className="text-center">
               <div className="text-6xl mb-6">🎉</div>
               <h1 className="text-5xl font-bold text-yellow-400 mb-4 drop-shadow-lg animate-bounce">
-                Браво! Успех!
+                GAME OVER
               </h1>
+              <h2 className="text-3xl font-bold text-white mb-8 drop-shadow-lg">
+                Браво! Успех!
+              </h2>
+              <p className="text-xl text-white mb-8 drop-shadow-lg">
+                Завърши успешно K1 режима!
+              </p>
             </div>
           </div>
         )}
