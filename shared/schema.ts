@@ -65,11 +65,13 @@ export const gameLayouts = pgTable("game_layouts", {
     index: string[];
     position: { top: string; left: string };
     diameter: string;
+    strict?: boolean;
   }>>(),
   slots_mobile: jsonb("slots_mobile").$type<Array<{
     index: string[];
     position: { top: string; left: string };
     diameter: string;
+    strict?: boolean;
   }>>(),
   createdAt: timestamp("created_at").default(sql`now()`),
 });
@@ -144,6 +146,7 @@ export interface GameSlot {
   index: string[];
   position: { top: string; left: string };
   diameter: string;
+  strict?: boolean;
 }
 
 export interface GameState {
@@ -171,6 +174,7 @@ export interface GameSession {
     index: string[];
     position: { top: string; left: string };
     diameter: string;
+    strict?: boolean;
   }>;
   items: GameItem[];
   levelType: 'equals_cells' | 'cells_plus_two';

@@ -50,7 +50,7 @@ export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameP
     removeFromChoiceItems,
     placeItemInSlot,
     completeSlot,
-  } = useGameState({ cells: gameSession?.cells, items: gameSession?.items });
+  } = useGameState({ cells: gameSession?.cells, items: gameSession?.items, variantId });
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -149,7 +149,7 @@ export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameP
         setSelectedItem(item);
         showFeedback('success', 'КЪДЕ ЩЕ СЛОЖИШ ТОВА');
       } else if (selectedItem.id === item.id) {
-        const targetSlot = gameState.availableSlots.find(slot => isValidChoice(slot, item));
+        const targetSlot = gameState.availableSlots.find(slot => isValidChoice(slot, item, variantId));
         if (!targetSlot) {
           showFeedback('error', 'Няма място за този предмет!');
           playVoice('tryAgain');
@@ -167,7 +167,7 @@ export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameP
         playVoice('tryAgain');
         return;
       }
-      if (!isValidChoice(activeSlot, item)) {
+      if (!isValidChoice(activeSlot, item, variantId)) {
         showFeedback('error', 'Опитай пак!');
         playVoice('tryAgain');
         return;
@@ -190,7 +190,7 @@ export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameP
 
   return (
     <div className="fixed inset-0 z-30 w-screen h-screen">
-      <div className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-500" style={{ backgroundImage: `url('${backgroundUrl}')` }}>
+      <div className="absolute inset-0 bg-contain bg-center bg-no-repeat transition-all duration-500" style={{ backgroundImage: `url('${backgroundUrl}')` }}>
         <div className="absolute inset-0 bg-black/20"></div>
       </div>
       

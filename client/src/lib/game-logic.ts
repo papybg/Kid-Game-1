@@ -93,7 +93,14 @@ export function formatTime(seconds: number): string {
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
-export function isValidChoice(slot: GameSlot, item: GameItem): boolean {
+export function isValidChoice(slot: GameSlot, item: GameItem, variantId?: string): boolean {
+  // Special logic for k1 variant: if slot has only one index and is not strict,
+  // allow items that match only the first letter of the index
+  if (variantId === 'k1' && slot.index.length === 1 && !slot.strict) {
+    const slotIndex = slot.index[0];
+    return item.index.startsWith(slotIndex.charAt(0));
+  }
+
   // Check exact match first
   if (slot.index.includes(item.index)) {
     return true;

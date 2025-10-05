@@ -5,16 +5,16 @@ import { Label } from "../components/ui/label";
 import { Settings, Play, Brain, Gamepad2, Smartphone, Volume2 } from "lucide-react";
 import { useAudioContext } from "../components/audio-manager";
 import { useSettingsStore, type GameMode } from "../lib/settings-store";
+import { SettingsModal } from "../components/settings-modal";
 
 interface WelcomeProps {
   onEnterGame: () => void;
-  onOpenSettings: () => void;
   onGoToAdmin?: () => void;
   onGoToUnderConstruction?: () => void;
   onEnterPortals?: (variantId: string) => void;
 }
 
-export default function Welcome({ onEnterGame, onOpenSettings, onGoToUnderConstruction, onEnterPortals }: WelcomeProps) {
+export default function Welcome({ onEnterGame, onGoToUnderConstruction, onEnterPortals }: WelcomeProps) {
   const { initializeAudio, playSound } = useAudioContext();
   const { setGameMode } = useSettingsStore();
   const [selectedMode, setSelectedMode] = useState<GameMode>('advanced');
@@ -135,16 +135,7 @@ export default function Welcome({ onEnterGame, onOpenSettings, onGoToUnderConstr
         </div>
       </div>
 
-      {/* Settings Button */}
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={onOpenSettings}
-        className="absolute top-4 right-4 w-12 h-12 bg-white/20 rounded-xl hover:bg-white/30 text-white"
-        data-testid="button-settings"
-      >
-        <Settings className="w-6 h-6" />
-      </Button>
+      <SettingsModal />
     </div>
   );
 }

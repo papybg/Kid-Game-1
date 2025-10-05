@@ -5,7 +5,6 @@ import { Toaster } from "./components/ui/toaster";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { ThemeProvider } from "./components/theme-provider";
 import { AudioProvider } from "./components/audio-manager";
-import { SettingsModal } from "./components/settings-modal";
 
 import Welcome from "./pages/welcome";
 import VariantSelection from "./pages/variant-selection";
@@ -25,7 +24,6 @@ function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>("welcome");
   const [selectedPortal, setSelectedPortal] = useState<Portal | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<GameVariant | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [gameKey, setGameKey] = useState(0); // Key to force Game component remount
 
   // Check for admin route on mount and handle URL changes
@@ -102,14 +100,6 @@ function App() {
     handlePlayAgain();
   };
 
-  const handleOpenSettings = () => {
-    setSettingsOpen(true);
-  };
-
-  const handleCloseSettings = () => {
-    setSettingsOpen(false);
-  };
-
   const handleGoToAdmin = () => {
     setCurrentScreen("admin");
     window.history.pushState(null, '', '/admin');
@@ -124,7 +114,6 @@ function App() {
               {currentScreen === "welcome" && (
                 <Welcome 
                   onEnterGame={handleEnterGame}
-                  onOpenSettings={handleOpenSettings}
                   onGoToAdmin={handleGoToAdmin}
                   onGoToUnderConstruction={() => setCurrentScreen('under')}
                   onEnterPortals={handleEnterPortals}
@@ -183,8 +172,6 @@ function App() {
                 <UnderConstruction onBack={() => setCurrentScreen('welcome')} />
               )}
             </div>
-            
-            <SettingsModal />
             
             <Toaster />
           </TooltipProvider>

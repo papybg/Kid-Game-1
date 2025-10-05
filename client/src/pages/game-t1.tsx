@@ -201,7 +201,7 @@ export default function GameT1({ portalId, variantId, onBackToMenu, onComplete }
     <div className="relative w-screen h-screen overflow-hidden">
       {/* Background */}
       <div 
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        className="absolute inset-0 bg-contain bg-center bg-no-repeat"
         style={{ 
           backgroundImage: `url(${backgroundImage})`
         }}

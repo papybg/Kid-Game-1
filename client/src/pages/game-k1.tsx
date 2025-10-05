@@ -73,7 +73,7 @@ export default function GameK1({ portalId, variantId, onBackToMenu, onComplete }
     const activeSlot = gameSession.cells[activeSlotIndex];
     
     // Use same validation logic as original game
-    if (!isValidChoice(activeSlot, item)) {
+    if (!isValidChoice(activeSlot, item, variantId)) {
       displayFeedback('Опитай пак!');
       playVoice('tryAgain');
       return;
@@ -185,7 +185,7 @@ export default function GameK1({ portalId, variantId, onBackToMenu, onComplete }
     <div className="relative w-screen h-screen overflow-hidden">
       {/* Background */}
       <div 
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        className="absolute inset-0 bg-contain bg-center bg-no-repeat"
         style={{ 
           backgroundImage: `url(${backgroundImage})`
         }}

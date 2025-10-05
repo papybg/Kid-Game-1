@@ -16,6 +16,7 @@ interface Slot {
   position: { top: string; left: string };
   diameter: string;
   index: string[];
+  strict?: boolean; // Optional field for strict matching
 }
 
 interface GameVariant {
@@ -836,21 +837,11 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
                       style={{ 
                         minHeight: '400px',
                         backgroundImage: backgroundImage ? `url('${backgroundImage}')` : 'linear-gradient(45deg, #f3f4f6 25%, transparent 25%), linear-gradient(-45deg, #f3f4f6 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f3f4f6 75%), linear-gradient(-45deg, transparent 75%, #f3f4f6 75%)',
-                        backgroundSize: backgroundImage ? 'cover' : '20px 20px',
+                        backgroundSize: backgroundImage ? 'contain' : '20px 20px',
                         backgroundPosition: backgroundImage ? 'center' : '0 0, 0 10px, 10px -10px, -10px 0px'
                       }}
                       onClick={handleCanvasClick}
                     >
-                      {/* Background image as img element for debugging */}
-                      {backgroundImage && (
-                        <img
-                          src={backgroundImage}
-                          alt="Background"
-                          className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-                          onError={(e) => console.error('Background image failed to load:', backgroundImage)}
-                          onLoad={() => console.log('Background image loaded successfully:', backgroundImage)}
-                        />
-                      )}
                       {/* Render Slots */}
                       {desktopSlots.map((slot) => (
                         <div
@@ -1009,6 +1000,20 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
                             />
                           </div>
 
+                          {/* Strict Slot */}
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`strict-${selectedSlotData.id}`}
+                              checked={selectedSlotData.strict ?? false}
+                              onCheckedChange={(checked) => {
+                                updateSlot(selectedSlotData.id, { strict: checked as boolean });
+                              }}
+                            />
+                            <Label htmlFor={`strict-${selectedSlotData.id}`} className="text-sm font-medium">
+                              Задължителна клетка (strict)
+                            </Label>
+                          </div>
+
                           {/* Delete Button */}
                           <Button 
                             variant="destructive" 
@@ -1047,21 +1052,11 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
                       style={{ 
                         minHeight: '400px',
                         backgroundImage: backgroundImage ? `url('${backgroundImage}')` : 'linear-gradient(45deg, #f3f4f6 25%, transparent 25%), linear-gradient(-45deg, #f3f4f6 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f3f4f6 75%), linear-gradient(-45deg, transparent 75%, #f3f4f6 75%)',
-                        backgroundSize: backgroundImage ? 'cover' : '20px 20px',
+                        backgroundSize: backgroundImage ? 'contain' : '20px 20px',
                         backgroundPosition: backgroundImage ? 'center' : '0 0, 0 10px, 10px -10px, -10px 0px'
                       }}
                       onClick={handleCanvasClick}
                     >
-                      {/* Background image as img element for debugging */}
-                      {backgroundImage && (
-                        <img
-                          src={backgroundImage}
-                          alt="Background"
-                          className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-                          onError={(e) => console.error('Mobile background image failed to load:', backgroundImage)}
-                          onLoad={() => console.log('Mobile background image loaded successfully:', backgroundImage)}
-                        />
-                      )}
                       {/* Render Mobile Slots */}
                       {mobileSlots.map((slot) => (
                         <div

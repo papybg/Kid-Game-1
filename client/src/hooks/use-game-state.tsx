@@ -5,6 +5,7 @@ import type { GameItem, GameSlot as Slot } from '@shared/schema';
 interface UseGameStateProps {
   cells: Slot[] | undefined;
   items: GameItem[] | undefined;
+  variantId?: string;
 }
 
 interface GameState {
@@ -20,7 +21,7 @@ interface GameState {
   timeElapsed: number;
 }
 
-export function useGameState({ cells, items }: UseGameStateProps) {
+export function useGameState({ cells, items, variantId }: UseGameStateProps) {
   const [gameState, setGameState] = React.useState<GameState>({
     hasStarted: false, // <-- ИНИЦИАЛИЗАЦИЯ
     isPlaying: false,
@@ -79,7 +80,7 @@ export function useGameState({ cells, items }: UseGameStateProps) {
 
   const makeChoice = React.useCallback((item: GameItem, slot: Slot, isSimpleMode: boolean, removeFromChoiceItems: boolean = true) => {
     const slotId = `${slot.position.top}-${slot.position.left}`;
-    const isValid = isValidChoice(slot, item);
+    const isValid = isValidChoice(slot, item, variantId);
 
     if (isValid) {
       setGameState(prev => {
@@ -103,7 +104,7 @@ export function useGameState({ cells, items }: UseGameStateProps) {
       });
     }
     return isValid;
-  }, []);
+  }, [variantId]);
 
   const removeFromChoiceItems = React.useCallback((itemId: number) => {
     setGameState(prev => ({
