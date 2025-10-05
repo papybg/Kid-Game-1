@@ -93,12 +93,35 @@ export function formatTime(seconds: number): string {
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
-export function isValidChoice(slot: GameSlot, item: GameItem, variantId?: string): boolean {
+export function isValidChoice(slot: GameSlot, item: GameItem, variantId?: string, availableSlots?: GameSlot[]): boolean {
   // Special logic for k1 variant: if slot has only one index and is not strict,
-  // allow items that match only the first letter of the index
+  // we accept single-letter items only if equal; for multi-letter items we must
+  // first check if there's a free slot for that full item.index - if so, reject
+  // (the multi-letter item belongs to its own slot). If no free slot exists,
+  // accept it as a fallback.
   if (variantId === 'k1' && slot.index.length === 1 && !slot.strict) {
     const slotIndex = slot.index[0];
-    return item.index.startsWith(slotIndex.charAt(0));
+
+    // If the item is single-letter, accept only exact match
+    if (item.index.length === 1) {
+      return item.index === slotIndex;
+    }
+
+    // Item has multi-letter index. If we have availableSlots context,
+    // check whether any available slot expects this exact item.index.
+    if (availableSlots && availableSlots.length > 0) {
+      const hasFreeExactSlot = availableSlots.some(s => s.index.includes(item.index));
+      if (hasFreeExactSlot) {
+        // There is a free slot for this multi-letter item -> do not accept here
+        return false;
+      }
+      // No free exact slot -> allow fallback placement
+      return true;
+    }
+
+    // Fallback: without context, be conservative and disallow multi-letter items
+    // from occupying a single-letter slot.
+    return false;
   }
 
   // Check exact match first

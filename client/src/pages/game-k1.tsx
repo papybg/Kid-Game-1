@@ -73,7 +73,7 @@ export default function GameK1({ portalId, variantId, onBackToMenu, onComplete }
     const activeSlot = gameSession.cells[activeSlotIndex];
     
     // Use same validation logic as original game
-    if (!isValidChoice(activeSlot, item, variantId)) {
+  if (!isValidChoice(activeSlot, item, variantId, gameSession ? gameSession.cells.filter(s => !placedItems[`${s.position.top}-${s.position.left}`]) : undefined)) {
       displayFeedback('Опитай пак!');
       playVoice('tryAgain');
       return;

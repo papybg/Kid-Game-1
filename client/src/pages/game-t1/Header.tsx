@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button } from "../components/ui/button";
+import { Button } from "../../components/ui/button";
 import { ArrowLeft, Volume2, VolumeX } from 'lucide-react';
 
 interface HeaderProps { onBackToMenu: () => void; onToggleSound: () => void; soundEnabled: boolean }

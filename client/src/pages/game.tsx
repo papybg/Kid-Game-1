@@ -149,7 +149,7 @@ export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameP
         setSelectedItem(item);
         showFeedback('success', 'КЪДЕ ЩЕ СЛОЖИШ ТОВА');
       } else if (selectedItem.id === item.id) {
-        const targetSlot = gameState.availableSlots.find(slot => isValidChoice(slot, item, variantId));
+  const targetSlot = gameState.availableSlots.find(slot => isValidChoice(slot, item, variantId, gameState.availableSlots));
         if (!targetSlot) {
           showFeedback('error', 'Няма място за този предмет!');
           playVoice('tryAgain');
@@ -167,7 +167,7 @@ export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameP
         playVoice('tryAgain');
         return;
       }
-      if (!isValidChoice(activeSlot, item, variantId)) {
+  if (!isValidChoice(activeSlot, item, variantId, gameState.availableSlots)) {
         showFeedback('error', 'Опитай пак!');
         playVoice('tryAgain');
         return;

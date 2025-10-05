@@ -3,6 +3,10 @@ import { Button } from "../components/ui/button";
 import { ArrowLeft, Volume2, VolumeX } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { LoadingSpinner } from "../components/ui/loading-spinner";
+import LoadingScreen from './game-t1/LoadingScreen';
+import ErrorScreen from './game-t1/ErrorScreen';
+import Header from './game-t1/Header';
+import WinScreen from './game-t1/WinScreen';
 import { GameSlotComponent } from "../components/game/game-slot";
 import { ChoiceItem } from "../components/game/choice-item";
 import { FeedbackMessageComponent } from "../components/game/feedback-message";
@@ -174,63 +178,7 @@ export default function GameT1({ portalId, variantId, onBackToMenu, onComplete }
     }
   }, [gamePhase, onComplete]);
 
-  // Helper components moved inside GameT1 to access local scope safely
-  type LoadingScreenProps = {};
-  const LoadingScreen: React.FC<LoadingScreenProps> = () => (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-100 to-purple-100">
-      <LoadingSpinner />
-    </div>
-  );
-
-  interface ErrorScreenProps { onBackToMenu: () => void; error?: any }
-  const ErrorScreen: React.FC<ErrorScreenProps> = ({ onBackToMenu, error }) => (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-100 to-purple-100">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-red-600 mb-4">Грешка при зареждането</h2>
-        <Button onClick={onBackToMenu}>Обратно към менюто</Button>
-      </div>
-    </div>
-  );
-
-  interface HeaderProps { onBackToMenu: () => void; onToggleSound: () => void; soundEnabled: boolean }
-  const Header: React.FC<HeaderProps> = ({ onBackToMenu, onToggleSound, soundEnabled }) => (
-    <div className="relative z-10 flex justify-between items-center p-4">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={onBackToMenu}
-        className="bg-white/80 backdrop-blur-sm"
-      >
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Обратно
-      </Button>
-
-      <div />
-
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onToggleSound}
-          className="bg-white/80 backdrop-blur-sm"
-        >
-          {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-        </Button>
-      </div>
-    </div>
-  );
-
-  type WinScreenProps = {};
-  const WinScreen: React.FC<WinScreenProps> = () => (
-    <div className="flex items-center justify-center h-full">
-      <div className="text-center">
-        <div className="text-6xl mb-6">🎉</div>
-        <h1 className="text-5xl font-bold text-yellow-400 mb-4 drop-shadow-lg animate-bounce">
-          Браво! Успех!
-        </h1>
-      </div>
-    </div>
-  );
+  
 
   if (sessionLoading) {
     return (

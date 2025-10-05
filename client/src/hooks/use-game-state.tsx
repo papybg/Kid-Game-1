@@ -80,7 +80,7 @@ export function useGameState({ cells, items, variantId }: UseGameStateProps) {
 
   const makeChoice = React.useCallback((item: GameItem, slot: Slot, isSimpleMode: boolean, removeFromChoiceItems: boolean = true) => {
     const slotId = `${slot.position.top}-${slot.position.left}`;
-    const isValid = isValidChoice(slot, item, variantId);
+  const isValid = isValidChoice(slot, item, variantId, gameState.availableSlots ? gameState.availableSlots : undefined);
 
     if (isValid) {
       setGameState(prev => {
