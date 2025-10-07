@@ -22,8 +22,10 @@ kill_port() {
     fi
 }
 
-# Kill processes on development ports
+# Kill processes on development ports (client + server)
 kill_port 8080
+
+# Kill server port
 kill_port 3005
 
 # Wait for ports to be freed

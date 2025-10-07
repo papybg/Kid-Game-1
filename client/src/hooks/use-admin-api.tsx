@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 
 export interface AdminItem {
   id: number;
@@ -7,6 +7,18 @@ export interface AdminItem {
   audio?: string; // Добавяме звук към AdminItem
   index: string;
   category: string;
+}
+
+export interface AdminPortal {
+  id: string;
+  portalName: string;
+  fileName: string;
+  iconFileName: string;
+  layouts: string[];
+  cellCount: number;
+  // min_cells and max_cells removed - using only variantSettings now
+  item_count_rule: string;
+  isLocked: boolean;
 }
 
 export interface Portal {

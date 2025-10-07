@@ -22,19 +22,19 @@ async function runNewTests() {
 
   const testCases = [
     { 
-      url: 'http://localhost:3005/api/game-session/d2?device=desktop&mode=simple', 
+  url: 'http://localhost:3005/api/game-session/d2?device=desktop&mode=simple', 
       description: 'D2 без variant' 
     },
     { 
-      url: 'http://localhost:3005/api/game-session/d2?device=desktop&mode=simple&variant=t1', 
+  url: 'http://localhost:3005/api/game-session/d2?device=desktop&mode=simple&variant=t1', 
       description: 'D2 с variant=t1' 
     },
     { 
-      url: 'http://localhost:3005/api/game-session/d2?device=desktop&mode=simple&variant=k1', 
+  url: 'http://localhost:3005/api/game-session/d2?device=desktop&mode=simple&variant=k1', 
       description: 'D2 с variant=k1' 
     },
     { 
-      url: 'http://localhost:3005/api/game-session/d1?device=desktop&mode=simple&variant=t1', 
+  url: 'http://localhost:3005/api/game-session/d1?device=desktop&mode=simple&variant=t1', 
       description: 'D1 с variant=t1 (за сравнение)' 
     }
   ];
@@ -76,7 +76,7 @@ async function runNewTests() {
   
   for (let i = 1; i <= 5; i++) {
     try {
-      const response = await testAPI('http://localhost:3005/api/game-session/d2?device=desktop&mode=simple&variant=t1');
+  const response = await testAPI('http://localhost:3005/api/game-session/d2?device=desktop&mode=simple&variant=t1');
       console.log(`   Тест ${i}: ${response.cells.length} клетки, ${response.items.length} предмети`);
       await new Promise(resolve => setTimeout(resolve, 100));
     } catch (e: any) {

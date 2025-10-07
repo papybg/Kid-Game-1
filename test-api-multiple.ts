@@ -2,7 +2,7 @@ import * as http from 'http';
 
 function testAPI(): Promise<any> {
   return new Promise((resolve, reject) => {
-    const url = 'http://localhost:3005/api/game-session/d2?device=desktop&mode=simple&variant=t1';
+  const url = 'http://localhost:3005/api/game-session/d2?device=desktop&mode=simple&variant=t1';
 
     http.get(url, (res) => {
       let data = '';

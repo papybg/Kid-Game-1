@@ -22,17 +22,17 @@ async function testVariants() {
 
   const testCases = [
     { 
-      url: 'http://localhost:3005/api/game-session/d2?device=desktop&mode=simple', 
+  url: 'http://localhost:3005/api/game-session/d2?device=desktop&mode=simple', 
       description: 'D2 БЕЗ variant',
       expected: '9 клетки (portal настройки: min_cells=9, max_cells=9)'
     },
     { 
-      url: 'http://localhost:3005/api/game-session/d2?device=desktop&mode=simple&variant=t1', 
+  url: 'http://localhost:3005/api/game-session/d2?device=desktop&mode=simple&variant=t1', 
       description: 'D2 с variant=t1',
       expected: '9 клетки (трябва да игнорира variant settings)'
     },
     { 
-      url: 'http://localhost:3005/api/game-session/d2?device=desktop&mode=simple&variant=k1', 
+  url: 'http://localhost:3005/api/game-session/d2?device=desktop&mode=simple&variant=k1', 
       description: 'D2 с variant=k1',
       expected: '9 клетки (трябва да игнорира variant settings)'
     }

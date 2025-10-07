@@ -4,7 +4,7 @@ async function testGameSession() {
   try {
     console.log('Тестване на генериране на игра за портал d2...\n');
 
-    const response = await fetch('http://localhost:3005/api/game-session/d2?mode=simple');
+  const response = await fetch('http://localhost:3005/api/game-session/d2?mode=simple');
     const data = await response.json();
 
     console.log(`Брой клетки: ${data.cells.length}`);

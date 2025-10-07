@@ -13,12 +13,12 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  server: {
-    port: 8080, // Добавяме това, за да сме сигурни, че винаги ще стартира на порт 8080
-  },
-  preview: {
-    port: 8080,
-  },
+    server: {
+      port: 8080,
+    },
+    preview: {
+      port: 8080,
+    },
   build: {
     rollupOptions: {
       output: {

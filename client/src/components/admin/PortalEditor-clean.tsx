@@ -341,8 +341,7 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
           iconFileName: selectedIcon || backgroundFileName,
           layouts: [layoutId],
           cellCount: desktopSlots.length,
-          min_cells: Math.max(1, desktopSlots.length - 2),
-          max_cells: desktopSlots.length + 2,
+          // No longer set min_cells/max_cells - rely entirely on variantSettings
           item_count_rule: "equals_cells",
           variantSettings: variantSettings,
           isLocked: false
@@ -392,8 +391,7 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
           iconFileName: selectedIcon || backgroundFileName,
           layouts: [layoutId],
           cellCount: desktopSlots.length,
-          min_cells: Math.max(1, desktopSlots.length - 2),
-          max_cells: desktopSlots.length + 2,
+          // No longer set min_cells/max_cells - rely entirely on variantSettings
           item_count_rule: "equals_cells",
           variantSettings: variantSettings,
           isLocked: false
@@ -485,6 +483,7 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
           
           // Load portal settings from portal data
           setPortalName(portal.portalName || '');
+          
           if (layout?.backgroundLarge) {
             const fileName = layout.backgroundLarge.split('/').pop() || 'dolina-large.png';
             setBackgroundFileName(fileName);
@@ -498,6 +497,11 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
               id: slot.id || `desktop-slot-${Date.now()}-${index}`
             }));
             setDesktopSlots(slotsWithIds);
+          }
+
+          // If portal contains variant settings, load them into local state so they can be edited
+          if (portal?.variantSettings) {
+            setVariantSettings(portal.variantSettings);
           }
           
           // Load mobile slots if available (they will be scaled from desktop slots)
@@ -739,16 +743,16 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
             </div>
           </DialogHeader>
 
-          {/* Portal Settings Section */}
-          <div className="p-3 border-b bg-gray-50">
-            <h3 className="text-lg font-semibold mb-3">Настройки на портал</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Portal Settings Section - Compact */}
+          <div className="p-2 border-b bg-gray-50">
+            <h3 className="text-sm font-semibold mb-2">Настройки на портал</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               {/* Portal Name */}
-              <div className="space-y-2">
-                <Label htmlFor="portal-name" className="text-sm">Име на портала</Label>
+              <div className="space-y-1">
+                <Label htmlFor="portal-name" className="text-xs">Име на портала</Label>
                 <Input
                   id="portal-name"
-                  className="h-8"
+                  className="h-7 text-sm"
                   value={portalName}
                   onChange={(e) => setPortalName(e.target.value)}
                   placeholder="Въведете име на портала..."
@@ -756,24 +760,23 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
               </div>
 
               {/* Background File */}
-              <div className="space-y-2">
-                <Label className="text-sm">Фонова картина</Label>
-                <div className="flex gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Фонова картина</Label>
+                <div className="flex gap-1">
                   <Input
                     value={backgroundFileName}
                     readOnly
-                    placeholder="Няма избран файл - моля качете нов"
-                    className="h-8 flex-1"
+                    placeholder="Няма избран файл"
+                    className="h-7 flex-1 text-xs"
                   />
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={() => document.getElementById('background-upload')?.click()}
-                    className="h-8 px-3"
+                    className="h-7 px-2"
                   >
-                    <Upload className="w-4 h-4 mr-1" />
-                    Upload
+                    <Upload className="w-3 h-3" />
                   </Button>
                 </div>
                 <input
@@ -786,22 +789,22 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
               </div>
 
               {/* Image Size Display */}
-              <div className="space-y-2">
-                <Label className="text-sm">Размер (пиксели)</Label>
-                <div className="h-8 px-3 py-1 border rounded-md bg-white text-sm flex items-center text-gray-600">
+              <div className="space-y-1">
+                <Label className="text-xs">Размер (пиксели)</Label>
+                <div className="h-6 px-2 py-1 border rounded-md bg-white text-xs flex items-center text-gray-600">
                   {imageSize.width} × {imageSize.height}
                 </div>
               </div>
 
               {/* Slot Mode */}
-              <div className="space-y-2">
-                <Label className="text-sm">Режим на фона</Label>
-                <RadioGroup value={slotMode} onValueChange={(value) => setSlotMode(value as any)} className="space-y-1">
-                  <div className="flex items-center space-x-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Режим на фона</Label>
+                <RadioGroup value={slotMode} onValueChange={(value) => setSlotMode(value as any)} className="flex gap-4">
+                  <div className="flex items-center space-x-1">
                     <RadioGroupItem value="with_cells" id="with_cells" />
                     <Label htmlFor="with_cells" className="text-xs">С клетки</Label>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-1">
                     <RadioGroupItem value="without_cells" id="without_cells" />
                     <Label htmlFor="without_cells" className="text-xs">Без клетки</Label>
                   </div>
@@ -813,19 +816,19 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
           {/* Main Content Area */}
           <div className="flex-1 overflow-hidden">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-              <TabsList className="grid w-full grid-cols-4 mx-3 mt-2 mb-0">
-                <TabsTrigger value="desktop" className="text-sm">Desktop</TabsTrigger>
-                <TabsTrigger value="mobile" className="text-sm">Mobile</TabsTrigger>
-                <TabsTrigger value="icon" className="text-sm">Икони</TabsTrigger>
-                <TabsTrigger value="variants" className="text-sm">Варианти</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-4 mx-2 mt-1 mb-0 h-8">
+                <TabsTrigger value="desktop" className="text-xs h-7">Desktop</TabsTrigger>
+                <TabsTrigger value="mobile" className="text-xs h-7">Mobile</TabsTrigger>
+                <TabsTrigger value="icon" className="text-xs h-7">Икони</TabsTrigger>
+                <TabsTrigger value="variants" className="text-xs h-7">Варианти</TabsTrigger>
               </TabsList>
 
               {/* Desktop Tab */}
               <TabsContent value="desktop" className="flex-1 overflow-hidden">
-                <div className="grid grid-cols-2 gap-4 h-full p-3">
-                  {/* Canvas Area - Left Half */}
-                  <div className="flex flex-col">
-                    <div className="mb-2">
+                <div className="flex gap-2 h-full p-2">
+                  {/* Canvas Area - Left Side (70%) */}
+                  <div className="flex flex-col flex-1" style={{ flex: '0 0 70%' }}>
+                    <div className="mb-1">
                       <p className="text-xs text-gray-600">
                         <strong>Shift+Click</strong> нов slot | <strong>Click</strong> селекция | <strong>Drag</strong> преместване
                       </p>
@@ -897,29 +900,29 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
                     </div>
                   </div>
 
-                  {/* Properties Panel - Right Half */}
-                  <div className="flex flex-col">
-                    <div className="bg-gray-50 p-4 rounded-lg flex-1 overflow-y-auto">
-                      <h3 className="font-semibold mb-4 text-lg">Properties</h3>
+                  {/* Properties Panel - Right Side (30%) */}
+                  <div className="flex flex-col" style={{ flex: '0 0 30%' }}>
+                    <div className="bg-gray-50 p-2 rounded-lg flex-1 overflow-y-auto">
+                      <h3 className="font-semibold mb-2 text-sm">Properties</h3>
                       
                       {selectedSlotData ? (
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                           {/* Slot ID */}
                           <div>
-                            <Label className="text-sm text-gray-500">Slot ID</Label>
-                            <p className="text-sm font-mono bg-white p-2 rounded border break-all">
+                            <Label className="text-xs text-gray-500">Slot ID</Label>
+                            <p className="text-xs font-mono bg-white p-1 rounded border break-all">
                               {selectedSlotData.id}
                             </p>
                           </div>
 
                           {/* Index Management */}
                           <div>
-                            <Label className="text-sm font-medium mb-2 block">Индекси</Label>
-                            <div className="space-y-2">
+                            <Label className="text-xs font-medium mb-1 block">Индекси</Label>
+                            <div className="space-y-1">
                               {/* Current indices display */}
                               <div className="flex flex-wrap gap-1">
                                 {selectedSlotData.index.map((idx) => (
-                                  <span key={idx} className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs flex items-center gap-1">
+                                  <span key={idx} className="bg-blue-100 text-blue-800 px-1 py-0.5 rounded text-xs flex items-center gap-1">
                                     {idx}
                                     <button
                                       onClick={() => removeIndexFromSlot(selectedSlotData.id, idx)}
@@ -933,7 +936,7 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
                               </div>
                               
                               {/* Add new index */}
-                              <div className="flex gap-2">
+                              <div className="flex gap-1">
                                 <Select 
                                   onValueChange={(value) => {
                                     if (!selectedSlotData.index.includes(value)) {
@@ -943,7 +946,7 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
                                     }
                                   }}
                                 >
-                                  <SelectTrigger className="h-8 flex-1">
+                                  <SelectTrigger className="h-6 flex-1 text-xs">
                                     <SelectValue placeholder="Добави индекс..." />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -961,13 +964,13 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
                           </div>
 
                           {/* Position */}
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-2 gap-2">
                             <div>
-                              <Label className="text-sm font-medium">Top (%)</Label>
+                              <Label className="text-xs font-medium">Top (%)</Label>
                               <Input 
                                 type="number" 
                                 step="0.1"
-                                className="h-10"
+                                className="h-6 text-xs"
                                 value={parseFloat(selectedSlotData.position.top)} 
                                 onChange={(e) => updateSlot(selectedSlotData.id, { 
                                   position: { ...selectedSlotData.position, top: `${e.target.value}%` }
@@ -975,11 +978,11 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
                               />
                             </div>
                             <div>
-                              <Label className="text-sm font-medium">Left (%)</Label>
+                              <Label className="text-xs font-medium">Left (%)</Label>
                               <Input 
                                 type="number" 
                                 step="0.1"
-                                className="h-10"
+                                className="h-6 text-xs"
                                 value={parseFloat(selectedSlotData.position.left)} 
                                 onChange={(e) => updateSlot(selectedSlotData.id, { 
                                   position: { ...selectedSlotData.position, left: `${e.target.value}%` }
@@ -990,18 +993,18 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
 
                           {/* Diameter */}
                           <div>
-                            <Label className="text-sm font-medium">Diameter (%)</Label>
+                            <Label className="text-xs font-medium">Diameter (%)</Label>
                             <Input 
                               type="number" 
                               step="0.5"
-                              className="h-10"
+                              className="h-6 text-xs"
                               value={parseFloat(selectedSlotData.diameter)} 
                               onChange={(e) => updateSlot(selectedSlotData.id, { diameter: `${e.target.value}%` })}
                             />
                           </div>
 
                           {/* Strict Slot */}
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-1">
                             <Checkbox
                               id={`strict-${selectedSlotData.id}`}
                               checked={selectedSlotData.strict ?? false}
@@ -1009,7 +1012,7 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
                                 updateSlot(selectedSlotData.id, { strict: checked as boolean });
                               }}
                             />
-                            <Label htmlFor={`strict-${selectedSlotData.id}`} className="text-sm font-medium">
+                            <Label htmlFor={`strict-${selectedSlotData.id}`} className="text-xs font-medium">
                               Задължителна клетка (strict)
                             </Label>
                           </div>
@@ -1017,17 +1020,17 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
                           {/* Delete Button */}
                           <Button 
                             variant="destructive" 
-                            className="w-full mt-6"
+                            className="w-full mt-2 h-6 text-xs"
                             onClick={() => deleteSlot(selectedSlotData.id)}
                           >
-                            <Trash2 className="w-4 h-4 mr-2" />
+                            <Trash2 className="w-3 h-3 mr-1" />
                             Delete Slot
                           </Button>
                         </div>
                       ) : (
-                        <div className="text-center text-gray-500 mt-12">
-                          <p className="text-lg mb-2">Селектирайте slot за редактиране</p>
-                          <p className="text-sm">Shift+Click върху canvas за създаване на нов slot</p>
+                        <div className="text-center text-gray-500 mt-6">
+                          <p className="text-sm mb-1">Селектирайте slot за редактиране</p>
+                          <p className="text-xs">Shift+Click върху canvas за създаване на нов slot</p>
                         </div>
                       )}
                     </div>
@@ -1037,10 +1040,10 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
 
               {/* Mobile Tab */}
               <TabsContent value="mobile" className="flex-1 overflow-hidden">
-                <div className="grid grid-cols-2 gap-4 h-full p-3">
-                  {/* Mobile Canvas Area - Left Half */}
-                  <div className="flex flex-col">
-                    <div className="mb-2">
+                <div className="flex gap-2 h-full p-2">
+                  {/* Mobile Canvas Area - Left Side (70%) */}
+                  <div className="flex flex-col flex-1" style={{ flex: '0 0 70%' }}>
+                    <div className="mb-1">
                       <p className="text-xs text-gray-600">
                         <strong>Shift+Click</strong> нов slot | <strong>Click</strong> селекция | <strong>Drag</strong> преместване
                       </p>
@@ -1112,8 +1115,8 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
                     </div>
                   </div>
 
-                  {/* Properties Panel - Right Half (shared with Desktop) */}
-                  <div className="flex flex-col">
+                  {/* Properties Panel - Right Side (30%) (shared with Desktop) */}
+                  <div className="flex flex-col" style={{ flex: '0 0 30%' }}>
                     {/* Generated Mobile File Preview */}
                     {generatedFiles.mobile && (
                       <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
@@ -1136,15 +1139,15 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
                       </div>
                     )}
 
-                    <div className="bg-gray-50 p-4 rounded-lg flex-1 overflow-y-auto">
-                      <h3 className="font-semibold mb-4 text-lg">Properties</h3>
+                    <div className="bg-gray-50 p-2 rounded-lg flex-1 overflow-y-auto">
+                      <h3 className="font-semibold mb-2 text-sm">Properties</h3>
                       
                       {selectedSlotData ? (
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                           {/* Slot ID */}
                           <div>
-                            <Label className="text-sm text-gray-500">Slot ID</Label>
-                            <p className="text-sm font-mono bg-white p-2 rounded border break-all">
+                            <Label className="text-xs text-gray-500">Slot ID</Label>
+                            <p className="text-xs font-mono bg-white p-1 rounded border break-all">
                               {selectedSlotData.id}
                             </p>
                           </div>

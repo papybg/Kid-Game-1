@@ -9,7 +9,7 @@ module.exports = {
       ignore_watch: ['node_modules', 'client'],
       env: {
         NODE_ENV: 'development',
-        PORT: 3005
+  PORT: 3005
       }
     },
     {
@@ -17,7 +17,7 @@ module.exports = {
       script: 'vite',
       instances: 1,
       autorestart: true,
-      args: '--host --port 8080 --strict-port',
+  args: '--host --port 8080 --strict-port',
       cwd: './client',
       env: {
         NODE_ENV: 'development'

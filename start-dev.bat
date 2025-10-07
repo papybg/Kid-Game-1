@@ -1,5 +1,5 @@
 @echo off
-echo Checking for processes using ports 5173 and 3005...
+echo Checking for processes using ports 8080 and 3005...
 
 REM Kill processes on port 8080 (Vite client)
 for /f "tokens=5" %%a in ('netstat -ano ^| findstr :8080') do (

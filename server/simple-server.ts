@@ -22,7 +22,7 @@ app.get('/api/health', (req, res) => {
 // Добави admin routes
 app.use('/api/admin', adminRoutes);
 
-const port = 3006;
+const port = 3005;
 
 app.listen(port, () => {
   console.log(`✅ Simple server is listening on port ${port}`);

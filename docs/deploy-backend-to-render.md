@@ -9,7 +9,7 @@ Deploy backend to Render (quick guide)
 7. Instance type: free / starter
 8. Add Environment Variable `ALLOWED_ORIGINS` and set it to the domains you need, for example:
    - `https://68c660dbd95386e3f66487fb--kid-game-1.netlify.app`
-   - `http://localhost:5173`
+   - `http://localhost:8080`
 
 9. Enable Auto-Deploy from the selected branch.
 10. After render finishes provision and first deploy, copy the service URL (e.g. `https://kidgame-backend.onrender.com`).

@@ -1,16 +1,18 @@
 import { useState, useEffect } from "react";
 import { useAdminItems, useDeleteItem, useAdminPortals, useAdminIndices, useDeleteIndices, type IndexInfo } from "../hooks/use-admin-api";
+import { useDarkMode } from "../hooks/use-dark-mode";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { Trash2, Edit, Plus, ArrowLeft } from "lucide-react";
+import { Trash2, Edit, Plus, ArrowLeft, Moon, Sun } from "lucide-react";
 import AddItemForm from "../components/admin/AddItemForm";
 import { PortalEditor } from "../components/admin/PortalEditor-clean";
 import AddIndexForm from "../components/admin/AddIndexForm";
 import type { AdminItem } from "../hooks/use-admin-api";
 
 export default function AdminPage() {
+  const { isDarkMode, toggleDarkMode } = useDarkMode();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -120,17 +122,38 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-blue-900 dark:to-indigo-900 transition-colors duration-300">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
-          <h1 className="text-4xl font-bold text-gray-800">
-            Админ Панел
-          </h1>
+          {/* Dark Mode Toggle - Top Left */}
+          <div className="flex items-center gap-4">
+            <Button
+              onClick={toggleDarkMode}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800"
+            >
+              {isDarkMode ? (
+                <>
+                  <Sun className="w-4 h-4" />
+                  Светъл режим
+                </>
+              ) : (
+                <>
+                  <Moon className="w-4 h-4" />
+                  Нощен режим
+                </>
+              )}
+            </Button>
+            <h1 className="text-4xl font-bold text-slate-800 dark:text-slate-100 font-display">
+              Админ Панел
+            </h1>
+          </div>
           <Button
             onClick={() => window.history.back()}
             variant="outline"
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800"
           >
             <ArrowLeft className="w-4 h-4" />
             Назад към играта
@@ -139,19 +162,34 @@ export default function AdminPage() {
 
         {/* Admin Tabs */}
         <Tabs defaultValue="items" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="items">Обекти</TabsTrigger>
-            <TabsTrigger value="portals">Портали</TabsTrigger>
-            <TabsTrigger value="indices">Индекси</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border border-slate-200 dark:border-slate-700">
+            <TabsTrigger 
+              value="items"
+              className="data-[state=active]:bg-blue-500 data-[state=active]:text-white dark:data-[state=active]:bg-blue-600"
+            >
+              Обекти
+            </TabsTrigger>
+            <TabsTrigger 
+              value="portals"
+              className="data-[state=active]:bg-blue-500 data-[state=active]:text-white dark:data-[state=active]:bg-blue-600"
+            >
+              Портали
+            </TabsTrigger>
+            <TabsTrigger 
+              value="indices"
+              className="data-[state=active]:bg-blue-500 data-[state=active]:text-white dark:data-[state=active]:bg-blue-600"
+            >
+              Индекси
+            </TabsTrigger>
           </TabsList>
 
           {/* Items Tab */}
           <TabsContent value="items" className="space-y-6">
             {/* Add Item Button */}
             <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-semibold text-gray-700">Управление на обекти</h2>
+              <h2 className="text-2xl font-semibold text-slate-700 dark:text-slate-200">Управление на обекти</h2>
               <Button 
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600"
                 onClick={() => setShowAddForm(true)}
               >
                 <Plus className="w-4 h-4" />
@@ -160,9 +198,9 @@ export default function AdminPage() {
             </div>
 
             {/* Items List */}
-            <Card>
+            <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-slate-200 dark:border-slate-700">
               <CardHeader>
-                <CardTitle>Всички обекти в играта</CardTitle>
+                <CardTitle className="text-slate-800 dark:text-slate-100">Всички обекти в играта</CardTitle>
               </CardHeader>
               <CardContent>
                 {itemsLoading ? (

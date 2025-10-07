@@ -81,7 +81,9 @@ export function setupRoutes(app: Express): void {
     try {
       const storage = await getStorage();
       const portals = await storage.getPortals();
-      res.json(portals);
+      // Ensure variantSettings is always present so UI can rely on it
+      const normalized = portals.map(p => ({ ...p, variantSettings: (p as any).variantSettings || {} }));
+      res.json(normalized);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch portals" });
     }
@@ -94,7 +96,7 @@ export function setupRoutes(app: Express): void {
       if (!portal) {
         return res.status(404).json({ message: "Portal not found" });
       }
-      res.json(portal);
+      res.json({ ...portal, variantSettings: (portal as any).variantSettings || {} });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch portal" });
     }
@@ -116,7 +118,9 @@ export function setupRoutes(app: Express): void {
         layout = await storage.getGameLayout(layoutId);
       }
 
-      res.json({ portal, layout });
+      // Make sure variantSettings is always an object (fallback to {}) to simplify client code
+      const normalizedPortal = { ...portal, variantSettings: (portal as any).variantSettings || {} };
+      res.json({ portal: normalizedPortal, layout });
     } catch (error) {
       console.error('Failed to fetch full portal data:', error);
       res.status(500).json({ message: "Failed to fetch portal data" });
@@ -136,7 +140,14 @@ export function setupRoutes(app: Express): void {
   app.post("/api/portals", async (req, res) => {
     try {
       const storage = await getStorage();
-      const newPortal = await storage.createPortal(req.body);
+      // Ensure variantSettings exists and add default min_cells/max_cells if missing (DB requires them)
+      const body = { 
+        ...req.body, 
+        variantSettings: req.body?.variantSettings || {},
+        min_cells: req.body?.min_cells ?? 0, // Default for DB constraint
+        max_cells: req.body?.max_cells ?? 0  // Default for DB constraint
+      };
+      const newPortal = await storage.createPortal(body);
       res.status(201).json(newPortal);
     } catch (error) {
       console.error('Failed to create portal:', error);
@@ -147,7 +158,15 @@ export function setupRoutes(app: Express): void {
   app.put("/api/portals/:id", async (req, res) => {
     try {
       const storage = await getStorage();
-      const updatedPortal = await storage.updatePortal(req.params.id, req.body);
+      // Normalize incoming payload to ensure required fields exist
+      const updates = { 
+        ...req.body, 
+        variantSettings: req.body?.variantSettings || {},
+        // Add default min_cells/max_cells if not provided (for DB constraint compatibility)
+        min_cells: req.body?.min_cells ?? 0,
+        max_cells: req.body?.max_cells ?? 0
+      };
+      const updatedPortal = await storage.updatePortal(req.params.id, updates);
       res.json(updatedPortal);
     } catch (error) {
       console.error('Failed to update portal:', error);
@@ -159,7 +178,12 @@ export function setupRoutes(app: Express): void {
     try {
       const storage = await getStorage();
       const portalId = decodeURIComponent(req.params.id);
-      const updatedPortal = await storage.updatePortal(portalId, req.body);
+      const updates = { ...req.body };
+      // Only enforce default for variantSettings if it's explicitly provided as null/undefined on updates
+      if ('variantSettings' in updates) {
+        updates.variantSettings = updates.variantSettings || {};
+      }
+      const updatedPortal = await storage.updatePortal(portalId, updates);
       res.json(updatedPortal);
     } catch (error) {
       console.error('Failed to patch portal:', error);

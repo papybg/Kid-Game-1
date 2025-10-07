@@ -314,8 +314,7 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
           iconFileName: selectedIcon || backgroundFileName,
           layouts: [layoutId],
           cellCount: desktopSlots.length,
-          min_cells: Math.max(1, desktopSlots.length - 2),
-          max_cells: desktopSlots.length + 2,
+          // No longer set min_cells/max_cells - rely entirely on variantSettings
           item_count_rule: "equals_cells",
           variantSettings: variantSettings,
           isLocked: false
@@ -407,6 +406,7 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
           
           // Load portal settings from portal data
           setPortalName(portal.portalName || '');
+          
           if (layout?.backgroundLarge) {
             const fileName = layout.backgroundLarge.split('/').pop() || 'dolina-large.png';
             setBackgroundFileName(fileName);

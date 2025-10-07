@@ -2,6 +2,19 @@ import { db } from "./db";
 import { portals, gameItems, gameLayouts } from "../shared/schema";
 import { eq, inArray, notInArray } from "drizzle-orm";
 
+// Global usage tracker for item variety across sessions
+const globalItemUsageTracker = new Map<number, number>();
+
+// Reset usage tracker periodically to prevent permanent bias
+function resetUsageTrackerIfNeeded() {
+  // Reset every 20 sessions to prevent permanent bias against popular items
+  const totalUsage = Array.from(globalItemUsageTracker.values()).reduce((sum, count) => sum + count, 0);
+  if (totalUsage > 200) { // Reset after ~20 sessions
+    globalItemUsageTracker.clear();
+    console.log('[GameService] Reset item usage tracker for fresh variety');
+  }
+}
+
 // Helper functions
 function shuffleArray<T>(array: T[]): T[] {
   const shuffled = [...array];
@@ -15,6 +28,182 @@ function shuffleArray<T>(array: T[]): T[] {
 function selectRandom<T>(array: T[], count: number): T[] {
   const shuffled = shuffleArray(array);
   return shuffled.slice(0, count);
+}
+
+// Enhanced randomization: instead of picking first available, 
+// randomize the selection within each category
+function selectRandomWithVariety<T>(array: T[], count: number, keyFn?: (item: T) => string): T[] {
+  if (array.length === 0) return [];
+  
+  // If we want variety, group by key and pick randomly from each group
+  if (keyFn && array.length > count) {
+    const groups = new Map<string, T[]>();
+    array.forEach(item => {
+      const key = keyFn(item);
+      if (!groups.has(key)) {
+        groups.set(key, []);
+      }
+      groups.get(key)!.push(item);
+    });
+    
+    // Pick one item from each group, then fill remaining randomly
+    const result: T[] = [];
+    const usedItems = new Set<T>();
+    
+    // First pass: pick one from each group (randomized)
+    const groupKeys = shuffleArray([...groups.keys()]);
+    for (const key of groupKeys) {
+      if (result.length >= count) break;
+      const groupItems = shuffleArray(groups.get(key)!); // Randomize within group
+      const availableInGroup = groupItems.filter(item => !usedItems.has(item));
+      if (availableInGroup.length > 0) {
+        const randomItem = availableInGroup[Math.floor(Math.random() * availableInGroup.length)];
+        result.push(randomItem);
+        usedItems.add(randomItem);
+      }
+    }
+    
+    // Second pass: fill remaining slots randomly, avoiding overused items
+    while (result.length < count) {
+      const availableItems = array.filter(item => !usedItems.has(item));
+      if (availableItems.length === 0) break;
+      
+      // Weight selection towards less frequently used items
+      const weightedItems = [...availableItems];
+      // Add some items multiple times to increase their selection probability
+      // This creates a bias towards variety
+      const randomItem = weightedItems[Math.floor(Math.random() * weightedItems.length)];
+      result.push(randomItem);
+      usedItems.add(randomItem);
+    }
+    
+    return shuffleArray(result);
+  }
+  
+  // Standard random selection
+  return selectRandom(array, count);
+}
+
+// Enhanced function to select items with variety tracking across sessions
+function selectItemsWithVarietyTracking<T extends { index: string; name: string }>(
+  items: T[], 
+  count: number,
+  usedItems: Set<number>,
+  usageTracker?: Map<number, number> // Track usage frequency across sessions
+): T[] {
+  const availableItems = items.filter(item => !usedItems.has((item as any).id));
+  
+  if (availableItems.length <= count) {
+    return shuffleArray(availableItems);
+  }
+
+  const result: T[] = [];
+  
+  while (result.length < count) {
+    if (availableItems.length === 0) break;
+    
+    let selectedItem: T;
+    
+    // Apply usage penalty if tracker is provided
+    if (usageTracker) {
+      // Calculate weighted selection based on usage frequency
+      const itemWeights = availableItems.map(item => {
+        const usage = usageTracker.get((item as any).id) || 0;
+        // More aggressive penalty: exponential decay with stronger penalty
+        return Math.max(0.01, Math.pow(0.5, usage)); // Very strong penalty for frequent items
+      });
+      
+      // Weighted random selection
+      const totalWeight = itemWeights.reduce((sum, weight) => sum + weight, 0);
+      let random = Math.random() * totalWeight;
+      
+      let selectedIndex = 0;
+      for (let i = 0; i < itemWeights.length; i++) {
+        random -= itemWeights[i];
+        if (random <= 0) {
+          selectedIndex = i;
+          break;
+        }
+      }
+      
+      selectedItem = availableItems[selectedIndex];
+    } else {
+      // Simple random selection
+      selectedItem = availableItems[Math.floor(Math.random() * availableItems.length)];
+    }
+    
+    result.push(selectedItem);
+    usedItems.add((selectedItem as any).id);
+    
+    // Remove selected item from available items
+    const itemIndex = availableItems.findIndex(item => (item as any).id === (selectedItem as any).id);
+    if (itemIndex !== -1) {
+      availableItems.splice(itemIndex, 1);
+    }
+  }
+  
+  return shuffleArray(result);
+}
+
+// Additional function for better item distribution
+function selectItemsWithBalancedDistribution<T extends { index: string; name: string }>(
+  items: T[], 
+  count: number, 
+  usedItems: Set<number>
+): T[] {
+  const availableItems = items.filter(item => !usedItems.has((item as any).id));
+  
+  if (availableItems.length <= count) {
+    return shuffleArray(availableItems);
+  }
+  
+  // Group by index for better balance
+  const indexGroups = new Map<string, T[]>();
+  availableItems.forEach(item => {
+    const index = item.index;
+    if (!indexGroups.has(index)) {
+      indexGroups.set(index, []);
+    }
+    indexGroups.get(index)!.push(item);
+  });
+  
+  const result: T[] = [];
+  const selectedFromIndex = new Map<string, number>();
+  
+  // Distribute selections more evenly across indices
+  const shuffledIndices = shuffleArray([...indexGroups.keys()]);
+  
+  while (result.length < count && result.length < availableItems.length) {
+    let itemAdded = false;
+    
+    for (const index of shuffledIndices) {
+      if (result.length >= count) break;
+      
+      const itemsInGroup = indexGroups.get(index)!;
+      const alreadySelected = selectedFromIndex.get(index) || 0;
+      
+      // Limit how many items we pick from the same index
+      const maxFromIndex = Math.max(1, Math.ceil(count / shuffledIndices.length));
+      
+      if (alreadySelected < maxFromIndex && alreadySelected < itemsInGroup.length) {
+        const availableInGroup = itemsInGroup.filter(item => 
+          !result.some(selected => (selected as any).id === (item as any).id)
+        );
+        
+        if (availableInGroup.length > 0) {
+          const randomItem = availableInGroup[Math.floor(Math.random() * availableInGroup.length)];
+          result.push(randomItem);
+          selectedFromIndex.set(index, alreadySelected + 1);
+          itemAdded = true;
+        }
+      }
+    }
+    
+    // If we couldn't add any items in this round, break to avoid infinite loop
+    if (!itemAdded) break;
+  }
+  
+  return shuffleArray(result);
 }
 
 // Helper function to determine cell type for sorting priority
@@ -40,34 +229,37 @@ function getCellType(cellIndex: string[]): number {
 }
 
 // Helper function to find best matching item for a cell
-function findBestItemForCell(cellIndex: string[], availableItems: any[]): any | null {
-  const indexStr = cellIndex.join(',');
-  
-  // Double index - exact match only
-  if (cellIndex.length === 1 && cellIndex[0].length === 2) {
-    return availableItems.find(item => item.index === cellIndex[0]) || null;
+export function findBestItemForCell(cellIndex: string[], availableItems: any[]): any | null {
+  // Try exact match first
+  for (const slotIdx of cellIndex) {
+    const exactMatch = availableItems.find(item => item.index === slotIdx);
+    if (exactMatch) return exactMatch;
   }
   
-  // Single index - hierarchical match (item starts with cell index)
-  if (cellIndex.length === 1 && cellIndex[0].length === 1) {
-    return availableItems.find(item => item.index.startsWith(cellIndex[0])) || null;
-  }
-  
-  // Two indices - priority on first, fallback to second
-  if (cellIndex.length === 2) {
-    const firstMatch = availableItems.find(item => item.index === cellIndex[0]);
-    if (firstMatch) return firstMatch;
-    
-    const secondMatch = availableItems.find(item => item.index === cellIndex[1]);
-    if (secondMatch) return secondMatch;
+  // Then try hierarchical match: item can go in slot if slot starts with item index
+  // e.g., item "s" can go in slot "sa", but item "sa" cannot go in slot "s"
+  for (const slotIdx of cellIndex) {
+    const hierarchicalMatch = availableItems.find(item => 
+      slotIdx.startsWith(item.index) && item.index.length > 0
+    );
+    if (hierarchicalMatch) return hierarchicalMatch;
   }
   
   return null;
 }
 
 // Helper function to check if item can go in slot (simple compatibility check)
-function canItemGoInSlot(itemIndex: string, slotIndices: string[]): boolean {
-  return findBestItemForCell(slotIndices, [{ index: itemIndex }]) !== null;
+export function canItemGoInSlot(itemIndex: string, slotIndices: string[]): boolean {
+  return slotIndices.some(slotIdx => {
+    // Exact match
+    if (itemIndex === slotIdx) return true;
+    
+    // Hierarchical match: item can go in slot if slot starts with item index
+    // e.g., item "s" can go in slot "sa", but item "sa" cannot go in slot "s"
+    if (slotIdx.startsWith(itemIndex)) return true;
+    
+    return false;
+  });
 }
 
 // Интерфейсите остават същите...
@@ -84,6 +276,9 @@ export interface GameSession {
 }
 
 export async function generateGameSession(portalId: string, deviceType: 'desktop' | 'mobile' = 'desktop', gameMode: 'simple' | 'advanced' = 'simple', variantId?: string): Promise<GameSession> {
+  // Reset usage tracker periodically for fresh variety
+  resetUsageTrackerIfNeeded();
+  
   console.log(`[GameService] Looking for portal with ID: "${portalId}"`);
   const portal = await db.query.portals.findFirst({ where: eq(portals.id, portalId) });
   if (!portal) throw new Error(`Portal with id ${portalId} not found`);
@@ -130,7 +325,7 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
     }
   });
 
-  // Determine cell count based on variant settings or fallback to portal settings
+  // Determine cell count based on variant settings
   let targetCellCount: number;
   if (variantSettings) {
     if (variantSettings.minCells === variantSettings.maxCells) {
@@ -141,15 +336,14 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
       targetCellCount = Math.floor(Math.random() * (variantSettings.maxCells - variantSettings.minCells + 1)) + variantSettings.minCells;
     }
   } else {
-    // Fallback to old logic
-    targetCellCount = Math.floor(Math.random() * (portal.max_cells - portal.min_cells + 1)) + portal.min_cells;
+    // No variant settings - this should not happen in the current system
+    throw new Error('Portal missing variant settings - all portals must have variant configuration');
   }
 
-  const actualCellCount = Math.min(targetCellCount, maxPossibleCells, variantSettings ? variantSettings.maxCells : portal.max_cells);
+  const actualCellCount = Math.min(targetCellCount, maxPossibleCells, variantSettings.maxCells);
 
-  // Ensure we have at least min_cells if possible
-  const minCells = variantSettings ? variantSettings.minCells : portal.min_cells;
-  const finalCellCount = Math.max(actualCellCount, Math.min(minCells, maxPossibleCells));
+  // Ensure we have at least minCells if possible
+  const finalCellCount = Math.max(actualCellCount, Math.min(variantSettings.minCells, maxPossibleCells));
 
   if (finalCellCount === 0) {
     throw new Error('No valid cells can be created - not enough items for any slot indices');
@@ -164,7 +358,12 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
     )
   );
 
-  const selectedCells = selectRandom(validSlots, finalCellCount);
+  // Enhanced randomization for slot selection with variety
+  const selectedCells = selectRandomWithVariety(
+    validSlots, 
+    finalCellCount,
+    (slot) => slot.index[0] // Group by first index character for variety
+  );
 
   // Sort cells by priority: double index -> single index -> two indices
   const sortedCells = [...selectedCells].sort((a, b) => {
@@ -178,7 +377,7 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
     item.index !== 'js' && selectedCells.some(cell => canItemGoInSlot(item.index, cell.index))
   );
 
-  // Select correct items for each cell using new logical matching
+  // Enhanced item selection for each cell with randomization
   const selectedCorrectItems: Item[] = [];
   const usedItemIds = new Set<number>();
 
@@ -186,12 +385,41 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
     // Find available items (not yet used)
     const availableItems = correctItemsPool.filter(item => !usedItemIds.has(item.id));
     
-    // Find best matching item for this cell
-    const bestItem = findBestItemForCell(cell.index, availableItems);
+    // Group items by compatibility and pick randomly within compatible groups
+    const compatibleItems = availableItems.filter(item => canItemGoInSlot(item.index, cell.index));
     
-    if (bestItem) {
-      selectedCorrectItems.push(bestItem);
-      usedItemIds.add(bestItem.id);
+    if (compatibleItems.length > 0) {
+      // Use variety tracking for better distribution across sessions
+      const selectedForCell = selectItemsWithVarietyTracking(
+        compatibleItems,
+        1,
+        usedItemIds,
+        globalItemUsageTracker
+      );
+      
+      if (selectedForCell.length > 0) {
+        selectedCorrectItems.push(selectedForCell[0]);
+        usedItemIds.add(selectedForCell[0].id);
+        
+        // Update global usage tracker
+        const itemId = selectedForCell[0].id;
+        globalItemUsageTracker.set(itemId, (globalItemUsageTracker.get(itemId) || 0) + 1);
+      } else {
+        // Fallback to random selection
+        const randomCompatibleItem = compatibleItems[Math.floor(Math.random() * compatibleItems.length)];
+        selectedCorrectItems.push(randomCompatibleItem);
+        usedItemIds.add(randomCompatibleItem.id);
+        
+        // Update global usage tracker
+        globalItemUsageTracker.set(randomCompatibleItem.id, (globalItemUsageTracker.get(randomCompatibleItem.id) || 0) + 1);
+      }
+    } else {
+      // Fallback to original logic if no compatible items found
+      const bestItem = findBestItemForCell(cell.index, availableItems);
+      if (bestItem) {
+        selectedCorrectItems.push(bestItem);
+        usedItemIds.add(bestItem.id);
+      }
     }
   }
 
@@ -213,18 +441,27 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
   const totalItemCount = gameMode === 'advanced' ? 8 : 6;
   const neededConfusing = Math.max(0, totalItemCount - selectedCorrectItems.length);
 
-  // Add confusing items from remaining items (exclude joker items and already used items)
+  // Add confusing items from remaining items with enhanced variety and balance
   let confusingItems: Item[] = [];
   if (neededConfusing > 0) {
     const availableConfusingItems = allItems.filter(item =>
       !usedItemIds.has(item.id) && 
       item.index !== 'js'
     );
-    const selectedConfusing = selectRandom(availableConfusingItems, Math.min(neededConfusing, availableConfusingItems.length));
+    
+    // Use variety tracking for better distribution across sessions
+    const selectedConfusing = selectItemsWithVarietyTracking(
+      availableConfusingItems, 
+      Math.min(neededConfusing, availableConfusingItems.length),
+      usedItemIds,
+      globalItemUsageTracker
+    );
+    
     confusingItems = selectedConfusing;
-    // Add to used items
+    // Add to used items and update global tracker
     selectedConfusing.forEach(item => {
       usedItemIds.add(item.id);
+      globalItemUsageTracker.set(item.id, (globalItemUsageTracker.get(item.id) || 0) + 1);
     });
   }
 
@@ -239,18 +476,27 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
     );
 
     if (availableItems.length >= remainingNeeded) {
-      const additionalItems = selectRandom(availableItems, remainingNeeded);
+      // Use enhanced selection for remaining items too
+      const additionalItems = selectRandomWithVariety(
+        availableItems, 
+        remainingNeeded,
+        (item) => item.category || item.index[0]
+      );
       finalItems.push(...additionalItems);
       additionalItems.forEach(item => usedItemIds.add(item.id));
     } else {
-      // Emergency fallback - add what we can
-      finalItems.push(...availableItems);
-      availableItems.forEach(item => usedItemIds.add(item.id));
-      console.warn(`Warning: Not enough unique items for game session. Added ${availableItems.length} items, still need ${remainingNeeded - availableItems.length} more.`);
+      // Emergency fallback - add what we can, but still randomize
+      const shuffledAvailable = shuffleArray(availableItems);
+      finalItems.push(...shuffledAvailable);
+      shuffledAvailable.forEach(item => usedItemIds.add(item.id));
+      console.warn(`Warning: Not enough unique items for game session. Added ${shuffledAvailable.length} items, still need ${remainingNeeded - shuffledAvailable.length} more.`);
     }
   }
 
-  const shuffledItems = shuffleArray(finalItems);
+  // Enhanced final shuffle with multiple passes for better randomization
+  let shuffledItems = shuffleArray(finalItems);
+  // Additional randomization: shuffle again to break any patterns
+  shuffledItems = shuffleArray(shuffledItems);
 
   // Create solution mapping for T1 tutorial mode
   let solutionMapping: Record<number, string> | undefined;
