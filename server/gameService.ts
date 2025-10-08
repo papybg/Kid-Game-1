@@ -229,37 +229,50 @@ function getCellType(cellIndex: string[]): number {
 }
 
 // Helper function to find best matching item for a cell
-export function findBestItemForCell(cellIndex: string[], availableItems: any[]): any | null {
-  // Try exact match first
+// Determine whether an item matches a slot according to the new rules:
+// - If the slot has `strict: true` => exact match required (item.index === slotIdx)
+// - Otherwise => match by first letter (item.index[0] === slotIdx[0])
+function canItemMatchSlot(itemIndex: string, slot: { index: string[]; strict?: boolean }): boolean {
+  for (const slotIdx of slot.index) {
+    if (slot.strict) {
+      if (itemIndex === slotIdx) return true;
+    } else {
+      if (itemIndex && slotIdx && itemIndex[0] === slotIdx[0]) return true;
+    }
+  }
+  return false;
+}
+
+export function findBestItemForCell(cellIndex: string[], availableItems: any[], slot?: { index: string[]; strict?: boolean }): any | null {
+  // If slot provided and strict -> prefer exact matches
+  if (slot && slot.strict) {
+    for (const slotIdx of cellIndex) {
+      const exactMatch = availableItems.find(item => item.index === slotIdx);
+      if (exactMatch) return exactMatch;
+    }
+    return null;
+  }
+
+  // Non-strict: prefer exact match first, then first-letter match
   for (const slotIdx of cellIndex) {
     const exactMatch = availableItems.find(item => item.index === slotIdx);
     if (exactMatch) return exactMatch;
   }
-  
-  // Then try hierarchical match: item can go in slot if slot starts with item index
-  // e.g., item "s" can go in slot "sa", but item "sa" cannot go in slot "s"
+
   for (const slotIdx of cellIndex) {
-    const hierarchicalMatch = availableItems.find(item => 
-      slotIdx.startsWith(item.index) && item.index.length > 0
-    );
-    if (hierarchicalMatch) return hierarchicalMatch;
+    const firstLetterMatch = availableItems.find(item => item.index && item.index[0] === slotIdx[0]);
+    if (firstLetterMatch) return firstLetterMatch;
   }
-  
+
   return null;
 }
 
 // Helper function to check if item can go in slot (simple compatibility check)
-export function canItemGoInSlot(itemIndex: string, slotIndices: string[]): boolean {
-  return slotIndices.some(slotIdx => {
-    // Exact match
-    if (itemIndex === slotIdx) return true;
-    
-    // Hierarchical match: item can go in slot if slot starts with item index
-    // e.g., item "s" can go in slot "sa", but item "sa" cannot go in slot "s"
-    if (slotIdx.startsWith(itemIndex)) return true;
-    
-    return false;
-  });
+export function canItemGoInSlot(itemIndex: string, slotIndices: string[], strict = false): boolean {
+  if (strict) {
+    return slotIndices.some(slotIdx => itemIndex === slotIdx);
+  }
+  return slotIndices.some(slotIdx => itemIndex && slotIdx && itemIndex[0] === slotIdx[0]);
 }
 
 // Интерфейсите остават същите...
@@ -283,13 +296,18 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
   const portal = await db.query.portals.findFirst({ where: eq(portals.id, portalId) });
   if (!portal) throw new Error(`Portal with id ${portalId} not found`);
 
-  // Get variant settings if variantId is provided
+  // Get variant settings if variantId is provided. We will not throw here; instead
+  // we will derive sensible defaults later once we know the layout/slots.
   let variantSettings: { minCells: number; maxCells: number; hasExtraItems: boolean } | null = null;
-  if (variantId && portal.variantSettings) {
-    variantSettings = portal.variantSettings[variantId];
-    console.log(`[GameService] Using variant settings for ${variantId}:`, variantSettings);
+  if (variantId && portal.variantSettings && typeof portal.variantSettings === 'object') {
+    variantSettings = portal.variantSettings[variantId] ?? null;
+    if (variantSettings) {
+      console.log(`[GameService] Using variant settings for ${variantId}:`, variantSettings);
+    } else {
+      console.log(`[GameService] Variant settings for '${variantId}' not found on portal; will use defaults based on layout`);
+    }
   } else {
-    console.log(`[GameService] No variant settings found. variantId: ${variantId}, portal.variantSettings:`, portal.variantSettings);
+    console.log(`[GameService] No variant settings present on portal; will use defaults based on layout. variantId: ${variantId}`);
   }
 
   const layout = await db.query.gameLayouts.findFirst({ where: eq(gameLayouts.id, portal.layouts[0]) });
@@ -298,6 +316,21 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
   // Select slots based on device type
   const slots = deviceType === 'mobile' ? layout.slots_mobile : layout.slots_desktop;
   if (!slots) throw new Error(`Slots not found for device ${deviceType} in portal ${portalId}`);
+
+  // If variantSettings was missing, derive safe defaults from the layout/slots
+  if (!variantSettings) {
+    const totalSlots = slots.length || 0;
+    // Default min: roughly half of available valid slots (but at least 1)
+    const defaultMin = Math.max(1, Math.floor(totalSlots / 2));
+    // Default max: min(defaultMin + 2, totalSlots)
+    const defaultMax = Math.max(defaultMin, Math.min(totalSlots, defaultMin + 2));
+    variantSettings = {
+      minCells: defaultMin,
+      maxCells: defaultMax,
+      hasExtraItems: false,
+    };
+    console.log(`[GameService] Applied derived default variant settings:`, variantSettings);
+  }
 
   // Get all available items first
   const allItems = await db.select().from(gameItems);
@@ -317,7 +350,7 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
   slots.forEach(slot => {
     const hasMatchingItem = slot.index.some(slotIdx => 
       allItems.some(item => 
-        item.index !== 'js' && canItemGoInSlot(item.index, [slotIdx])
+        item.index !== 'js' && canItemGoInSlot(item.index, [slotIdx], !!slot.strict)
       )
     );
     if (hasMatchingItem) {
@@ -326,7 +359,7 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
   });
 
   // Determine cell count based on variant settings
-  let targetCellCount: number;
+  let targetCellCount: number = 0;
   if (variantSettings) {
     if (variantSettings.minCells === variantSettings.maxCells) {
       // Exact number of cells
@@ -335,9 +368,6 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
       // Random between min and max
       targetCellCount = Math.floor(Math.random() * (variantSettings.maxCells - variantSettings.minCells + 1)) + variantSettings.minCells;
     }
-  } else {
-    // No variant settings - this should not happen in the current system
-    throw new Error('Portal missing variant settings - all portals must have variant configuration');
   }
 
   const actualCellCount = Math.min(targetCellCount, maxPossibleCells, variantSettings.maxCells);
@@ -353,7 +383,7 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
   const validSlots = slots.filter(slot =>
     slot.index.some(slotIdx => 
       allItems.some(item => 
-        item.index !== 'js' && canItemGoInSlot(item.index, [slotIdx])
+        item.index !== 'js' && canItemGoInSlot(item.index, [slotIdx], !!slot.strict)
       )
     )
   );
@@ -362,7 +392,13 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
   const selectedCells = selectRandomWithVariety(
     validSlots, 
     finalCellCount,
-    (slot) => slot.index[0] // Group by first index character for variety
+    // Group slots by their first index token (single-letter category semantics)
+    (slot) => {
+      const first = slot.index && slot.index[0];
+      if (!first) return '';
+      // If the first index token has length > 1, use its first char to represent the single-letter category
+      return first[0];
+    }
   );
 
   // Sort cells by priority: double index -> single index -> two indices
@@ -374,7 +410,7 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
 
   // Get items for selected cells (using hierarchical matching)
   const correctItemsPool = allItems.filter(item => 
-    item.index !== 'js' && selectedCells.some(cell => canItemGoInSlot(item.index, cell.index))
+    item.index !== 'js' && selectedCells.some(cell => canItemGoInSlot(item.index, cell.index, !!cell.strict))
   );
 
   // Enhanced item selection for each cell with randomization
@@ -386,7 +422,7 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
     const availableItems = correctItemsPool.filter(item => !usedItemIds.has(item.id));
     
     // Group items by compatibility and pick randomly within compatible groups
-    const compatibleItems = availableItems.filter(item => canItemGoInSlot(item.index, cell.index));
+  const compatibleItems = availableItems.filter(item => canItemGoInSlot(item.index, cell.index, !!cell.strict));
     
     if (compatibleItems.length > 0) {
       // Use variety tracking for better distribution across sessions
@@ -415,7 +451,7 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
       }
     } else {
       // Fallback to original logic if no compatible items found
-      const bestItem = findBestItemForCell(cell.index, availableItems);
+  const bestItem = findBestItemForCell(cell.index, availableItems, cell);
       if (bestItem) {
         selectedCorrectItems.push(bestItem);
         usedItemIds.add(bestItem.id);
@@ -437,8 +473,8 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
     }
   }
 
-  // Calculate total items needed
-  const totalItemCount = gameMode === 'advanced' ? 8 : 6;
+  // Calculate total items needed: must equal the number of selected cells
+  const totalItemCount = finalCellCount;
   const neededConfusing = Math.max(0, totalItemCount - selectedCorrectItems.length);
 
   // Add confusing items from remaining items with enhanced variety and balance
@@ -466,30 +502,53 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
   }
 
   // Combine all items
-  const finalItems = [...selectedCorrectItems, ...confusingItems];
+  let finalItems = [...selectedCorrectItems, ...confusingItems];
 
-  // If we still don't have enough items, fill with any remaining items (avoid duplicates)
-  if (finalItems.length < totalItemCount) {
+  // Ensure finalItems length equals totalItemCount. Trim extras or pad with jokers/test items.
+  if (finalItems.length > totalItemCount) {
+    // Prefer to keep selectedCorrectItems; trim confusing items first
+    finalItems = finalItems.slice(0, totalItemCount);
+  } else if (finalItems.length < totalItemCount) {
     const remainingNeeded = totalItemCount - finalItems.length;
     const availableItems = allItems.filter(item =>
       item.index !== 'js' && !usedItemIds.has(item.id)
     );
 
     if (availableItems.length >= remainingNeeded) {
-      // Use enhanced selection for remaining items too
       const additionalItems = selectRandomWithVariety(
-        availableItems, 
+        availableItems,
         remainingNeeded,
-        (item) => item.category || item.index[0]
+        (item: any) => {
+          if (item && item.index && item.index.length > 0) return item.index[0];
+          if (item && item.category && item.category.length > 0) return item.category[0];
+          return item.index || '';
+        }
       );
       finalItems.push(...additionalItems);
       additionalItems.forEach(item => usedItemIds.add(item.id));
     } else {
-      // Emergency fallback - add what we can, but still randomize
-      const shuffledAvailable = shuffleArray(availableItems);
-      finalItems.push(...shuffledAvailable);
-      shuffledAvailable.forEach(item => usedItemIds.add(item.id));
-      console.warn(`Warning: Not enough unique items for game session. Added ${shuffledAvailable.length} items, still need ${remainingNeeded - shuffledAvailable.length} more.`);
+      // Fill with joker items first, then test items
+      const jokerItems = allItems.filter(item => item.index === 'js' && !usedItemIds.has(item.id));
+      for (let i = 0; i < Math.min(remainingNeeded, jokerItems.length); i++) {
+        finalItems.push(jokerItems[i]);
+        usedItemIds.add(jokerItems[i].id);
+      }
+
+      if (finalItems.length < totalItemCount) {
+        const stillNeeded = totalItemCount - finalItems.length;
+        for (let i = 0; i < stillNeeded; i++) {
+          const testItem = {
+            id: 9999 + i, // Unique ID for each test item
+            name: `test-${i + 1}`,
+            image: "/images/1758906998565-smile.png",
+            index: "z",
+            category: "тест",
+            audio: null,
+            createdAt: null
+          };
+          finalItems.push(testItem as any);
+        }
+      }
     }
   }
 
@@ -507,7 +566,7 @@ export async function generateGameSession(portalId: string, deviceType: 'desktop
       const item = selectedCorrectItems[i];
       const cell = sortedCells[i];
       // TypeScript doesn't know about id, but it exists in runtime
-      solutionMapping[item.id] = (cell as any).id;
+      (solutionMapping as any)[(item as any).id] = (cell as any).id;
     }
   }
 

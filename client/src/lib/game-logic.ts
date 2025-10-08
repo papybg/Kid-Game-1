@@ -103,40 +103,13 @@ export function isValidChoice(slot: GameSlot, item: GameItem, variantId?: string
   if (slot.index.includes(item.index)) {
     return true;
   }
-
-  // Check hierarchical match: item can go in parent category
-  // e.g., "rp" (firetruck) can go in "r" (transport) slot
-  // or "s" (bird) can go in "sa" (aviation) slot
+  // Special logic for k1 variant: prevent multi-letter items from going into
+  // Non-strict slots: match by first letter (category) only
+  // Non-strict slots: match by first letter (category) only
   for (const slotIndex of slot.index) {
-    if (item.index.startsWith(slotIndex)) {
+    if (item.index && slotIndex && item.index[0] === slotIndex[0]) {
       return true;
     }
-  }
-
-  // Special logic for k1 variant: prevent multi-letter items from going into
-  // single-letter slots if there's a better choice slot available
-  if (variantId === 'k1' && slot.index.length === 1 && !slot.strict) {
-    const slotIndex = slot.index[0];
-
-    // Only restrict multi-letter items, not single-letter items
-    if (item.index.length > 1) {
-      // Item has multi-letter index. If we have availableSlots context,
-      // check whether any available slot with MULTIPLE indices expects this exact item.index.
-      // We ignore slots with single multi-letter index (like [sa]) as they are specific slots,
-      // not choice slots.
-      if (availableSlots && availableSlots.length > 0) {
-        const hasFreeChoiceSlot = availableSlots.some(s => 
-          s.index.length > 1 && s.index.includes(item.index)
-        );
-        if (hasFreeChoiceSlot) {
-          // There is a free choice slot for this multi-letter item -> do not accept here
-          return false;
-        }
-      }
-    }
-
-    // For single-letter items or when no choice slot exists, allow hierarchical placement
-    return true;
   }
 
   return false;

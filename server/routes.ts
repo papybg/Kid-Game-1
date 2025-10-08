@@ -317,4 +317,44 @@ export function setupRoutes(app: Express): void {
       res.status(500).json({ error: 'Failed to generate game session' });
     }
   });
+
+  // Validation endpoint for client-submitted placements (blueprint-mode like K1)
+  app.post("/api/game-session/:portalId/validate", async (req, res) => {
+    try {
+      const { portalId } = req.params;
+      const decodedPortalId = decodeURIComponent(portalId);
+      const deviceType = (req.query.device as 'desktop' | 'mobile') || 'desktop';
+      const gameMode = (req.query.mode as 'simple' | 'advanced') || 'simple';
+      const variantId = req.query.variant as string | undefined;
+
+      // Expect placements in the body: { placements: { [itemId]: cellId } }
+      const placements = req.body?.placements as Record<string, string> | undefined;
+      if (!placements || typeof placements !== 'object') {
+        return res.status(400).json({ message: 'placements object required in request body' });
+      }
+
+      // Regenerate the session with the same parameters (server is authoritative)
+      const sessionData = await generateGameSession(decodedPortalId, deviceType, gameMode, variantId);
+
+      // Ensure we have a solution mapping from the server
+      const solution = sessionData.solution || {};
+
+      const details: Array<{ itemId: number; expectedCellId: string | null; providedCellId: string | null; ok: boolean }> = [];
+      let allOk = true;
+
+      for (const key of Object.keys(placements)) {
+        const itemId = Number(key);
+        const provided = placements[key] || null;
+        const expected = (solution as any)[itemId] || null;
+        const ok = expected !== null && expected === provided;
+        if (!ok) allOk = false;
+        details.push({ itemId, expectedCellId: expected, providedCellId: provided, ok });
+      }
+
+      res.json({ valid: allOk, details });
+    } catch (error) {
+      console.error('Error validating game-session placements:', error);
+      res.status(500).json({ error: 'Failed to validate placements' });
+    }
+  });
 }

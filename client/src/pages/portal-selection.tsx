@@ -57,7 +57,16 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex flex-col p-4 bg-background">
+    <div
+      className="fixed inset-0 z-40 flex flex-col relative overflow-hidden h-screen bg-fixed"
+      style={{
+        backgroundImage: 'url("/images/backgrounds/fon_portals.jpg")',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        backgroundAttachment: 'fixed',
+      }}
+    >
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <Button
@@ -169,25 +178,6 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-      
-      {/* Progress Stats */}
-      <div className="mt-8 bg-card rounded-2xl p-6 shadow-lg">
-        <h3 className="font-semibold text-lg mb-4">Твоят прогрес</h3>
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <div>
-            <div className="text-2xl font-bold text-primary">3</div>
-            <div className="text-sm text-muted-foreground">Завършени нива</div>
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-success">85%</div>
-            <div className="text-sm text-muted-foreground">Точност</div>
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-orange-500">12м</div>
-            <div className="text-sm text-muted-foreground">Време за игра</div>
           </div>
         </div>
       </div>
