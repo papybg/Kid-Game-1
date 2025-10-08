@@ -213,8 +213,10 @@ export const useCreateCategoryIndex = () => {
       return response.json();
     },
     onSuccess: () => {
-      // Refresh categories list
+      // Refresh categories and indices lists
       queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-indices"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-items"] });
     },
   });
 };

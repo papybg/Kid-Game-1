@@ -573,23 +573,24 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
       }
     };
 
-    // Load categories/indices from database
+    // Load indices aggregated from game_items.index (server endpoint: /api/admin/indices)
     const loadCategories = async () => {
       try {
-  const response = await fetch(apiPath('/api/admin/categories'));
+        const response = await fetch(apiPath('/api/admin/indices'));
         if (response.ok) {
-          const categories = await response.json();
-          const indices = categories.map((cat: any) => ({
-            value: cat.indexValue,
-            label: `${cat.indexValue} - ${cat.categoryName}${cat.description ? ` (${cat.description})` : ''}`
+          const indicesResp = await response.json();
+          // indicesResp expected shape: { index, count, descriptions?, categories? }[]
+          const indices = (indicesResp || []).map((it: any) => ({
+            value: it.index,
+            label: `${it.index}${it.categories && it.categories.length ? ' - ' + it.categories.join(', ') : ''}${it.descriptions && it.descriptions.length ? ' (' + it.descriptions.join('; ') + ')' : ''}`
           }));
           setAvailableIndices(indices);
-          console.log('Loaded categories from database:', indices);
+          console.log('Loaded indices from game_items:', indices);
         } else {
-          console.log('Failed to load categories, using fallback');
+          console.log('Failed to load indices, using fallback');
         }
       } catch (error) {
-        console.error('Failed to load categories:', error);
+        console.error('Failed to load indices:', error);
       }
     };
 
@@ -836,6 +837,7 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
                     
                     <div 
                       ref={canvasRef}
+                      tabIndex={1}
                       className="relative w-full bg-gray-100 border-2 border-gray-300 rounded-lg overflow-hidden cursor-crosshair flex-1"
                       style={{ 
                         minHeight: '400px',
@@ -1051,6 +1053,7 @@ export function PortalEditor({ portalId, isOpen, onClose }: PortalEditorProps) {
                     
                     <div 
                       ref={mobileCanvasRef}
+                      tabIndex={1}
                       className="relative w-full bg-gray-100 border-2 border-gray-300 rounded-lg overflow-hidden cursor-crosshair flex-1"
                       style={{ 
                         minHeight: '400px',

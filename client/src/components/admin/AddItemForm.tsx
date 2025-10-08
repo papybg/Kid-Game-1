@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { useCreateItem, useUpdateItem, useAdminCategories, useCreateCategoryIndex, type CreateItemData, type AdminItem } from "../../hooks/use-admin-api";
+import { useCreateItem, useUpdateItem, useAdminCategories, useCreateCategoryIndex, useAdminIndices, type CreateItemData, type AdminItem } from "../../hooks/use-admin-api";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -31,6 +31,7 @@ export default function AddItemForm({ onClose, editItem }: AddItemFormProps) {
   const createItemMutation = useCreateItem();
   const updateItemMutation = useUpdateItem();
   const { data: categories, isLoading: categoriesLoading } = useAdminCategories();
+  const { data: indices, isLoading: indicesLoading } = useAdminIndices();
   const createCategoryIndexMutation = useCreateCategoryIndex();
   
   const {
@@ -60,8 +61,14 @@ export default function AddItemForm({ onClose, editItem }: AddItemFormProps) {
         setAudioFileName(editItem.audio.split('/').pop() || null);
       }
       
-      // Update available indexes for the category
-      if (categories) {
+      // Update available indexes for the category using aggregated indices (from game_items)
+      if (indices) {
+        const categoryIndexes = indices
+          .filter(idx => Array.isArray(idx.categories) && idx.categories.includes(editItem.category))
+          .map(idx => ({ indexValue: idx.index, description: (idx.descriptions && idx.descriptions[0]) || '' }));
+        setAvailableIndexes(categoryIndexes);
+      } else if (categories) {
+        // fallback to old categories source if indices not loaded yet
         const categoryIndexes = categories
           .filter(cat => cat.categoryName === editItem.category)
           .map(cat => ({ indexValue: cat.indexValue, description: cat.description || '' }));
@@ -76,8 +83,13 @@ export default function AddItemForm({ onClose, editItem }: AddItemFormProps) {
     setValue("category", category);
     setSelectedCategory(category);
     
-    // Update available indexes for this category
-    if (categories) {
+    // Update available indexes for this category using aggregated indices
+    if (indices) {
+      const categoryIndexes = indices
+        .filter(idx => Array.isArray(idx.categories) && idx.categories.includes(category))
+        .map(idx => ({ indexValue: idx.index, description: (idx.descriptions && idx.descriptions[0]) || '' }));
+      setAvailableIndexes(categoryIndexes);
+    } else if (categories) {
       const categoryIndexes = categories
         .filter(cat => cat.categoryName === category)
         .map(cat => ({ indexValue: cat.indexValue, description: cat.description || '' }));

@@ -69,24 +69,36 @@ router.post('/categories', async (req, res) => {
   try {
     const { categoryName, indexValue, description } = req.body;
 
-    // Валидирай
+    // Валидирай входа
     const validatedData = insertCategoriesIndicesSchema.parse({
       categoryName,
       indexValue,
       description
     });
-
-    // Генерирай следващо ID
+    // Save the category/index metadata into categories_indices (category only here)
+    // compute next id for categories_indices if needed
     const existingCategories = await db.select().from(categoriesIndices);
     const nextId = existingCategories.length > 0 ? Math.max(...existingCategories.map(c => c.id)) + 1 : 1;
 
-    // Запиши в базата с ръчно ID
     const newCategory = await db.insert(categoriesIndices).values({
       id: nextId,
       categoryName: validatedData.categoryName,
       indexValue: validatedData.indexValue,
       description: validatedData.description
     }).returning();
+
+    // Ensure the index exists in game_items (indices are sourced from game_items)
+    const existingItems = await db.select().from(gameItems).where(eq(gameItems.index, validatedData.indexValue));
+    if (existingItems.length === 0) {
+      const itemName = validatedData.categoryName || validatedData.indexValue;
+      await db.insert(gameItems).values({
+        name: itemName,
+        index: validatedData.indexValue,
+        category: null,
+        image: null,
+        audio: null
+      }).returning();
+    }
 
     res.status(201).json(newCategory[0]);
   } catch (error) {
@@ -263,19 +275,26 @@ router.delete('/items/:id', async (req, res) => {
 // GET /api/admin/indices - вземи всички уникални индекси от categories_indices таблицата
 router.get('/indices', async (req, res) => {
   try {
-    // Взимаме всички индекси от categories_indices таблицата
+    // Aggregate unique indices from game_items.index
     const indicesResult = await db
       .select({
-        index: categoriesIndices.indexValue,
+        index: gameItems.index,
         count: sql<number>`count(*)`,
-        descriptions: sql<string>`array_agg(${categoriesIndices.description})`,
-        categories: sql<string>`array_agg(${categoriesIndices.categoryName})`
+        // collect item names as descriptions for admin view
+        descriptions: sql<string>`array_agg(${gameItems.name})`,
+        // collect distinct categories
+        categories: sql<string>`array_agg(DISTINCT ${gameItems.category})`
       })
-      .from(categoriesIndices)
-      .groupBy(categoriesIndices.indexValue)
-      .orderBy(categoriesIndices.indexValue);
+      .from(gameItems)
+      .groupBy(gameItems.index)
+      .orderBy(gameItems.index);
 
-    res.json(indicesResult);
+    res.json(indicesResult.map((r: any) => ({
+      index: r.index,
+      count: parseInt(r.count, 10),
+      descriptions: r.descriptions || [],
+      categories: r.categories || []
+    })));
   } catch (error) {
     console.error('Error fetching indices:', error);
     res.status(500).json({ error: 'Failed to fetch indices' });
@@ -291,15 +310,15 @@ router.delete('/indices', async (req, res) => {
       return res.status(400).json({ error: 'Трябва да предоставите масив от индекси за изтриване' });
     }
 
-    console.log('Deleting indices:', indices);
+    console.log('Deleting indices from game_items:', indices);
 
-    // Изтрий записите от categories_indices таблицата
+    // Delete items that have these indices (indices are stored in game_items.index)
     const deleteResult = await db
-      .delete(categoriesIndices)
-      .where(sql`${categoriesIndices.indexValue} IN (${sql.join(indices, sql`, `)})`);
+      .delete(gameItems)
+      .where(sql`${gameItems.index} IN (${sql.join(indices, sql`, `)})`);
 
     res.json({ 
-      message: `Изтрити са записите за индекси: ${indices.join(', ')}`,
+      message: `Изтрити са предметите с индекси: ${indices.join(', ')}`,
       deletedIndices: indices
     });
   } catch (error) {
