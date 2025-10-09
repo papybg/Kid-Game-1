@@ -15,7 +15,20 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // За локална разработка, позволяваме заявки от Vite сървъра на порт 8080 и 8081
-app.use(cors({ origin: ['http://localhost:8080', 'http://localhost:8081'], credentials: true }));
+const allowedOrigins = ['https://bgm-design.com', 'https://kid-game-1.vercel.app']; // Add your exact Vercel address if different
+
+const corsOptions = {
+  origin: function (origin: any, callback: any) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions));
 
 // setupRoutes добавя всички API рутери
 setupRoutes(app);
