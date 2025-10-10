@@ -85,6 +85,7 @@ export function setupRoutes(app: Express): void {
       const normalized = portals.map(p => ({ ...p, variantSettings: (p as any).variantSettings || {} }));
       res.json(normalized);
     } catch (error) {
+      console.error('Error in GET /api/portals:', error);
       res.status(500).json({ message: "Failed to fetch portals" });
     }
   });
