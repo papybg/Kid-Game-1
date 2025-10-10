@@ -405,7 +405,10 @@ async function createStorage(): Promise<IStorage> {
       console.log("Using database storage (PostgreSQL)");
       _dbLogShown = true;
     }
-    const { DbStorage } = await import("./db-storage");
+    // When running built ESM files under Node, dynamic imports need the .js extension.
+    // Resolve relative to this file using import.meta.url so it works both in ts-node and in dist/.
+    const dbModuleUrl = new URL('./db-storage.js', import.meta.url).href;
+    const { DbStorage } = await import(dbModuleUrl);
     return new DbStorage();
   } else {
     if (!_dbLogShown) {
