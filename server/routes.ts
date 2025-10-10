@@ -1,5 +1,5 @@
 import type { Express, Request, Response } from "express";
-import { getStorage } from "./storage";
+import { getStorage, MemStorage } from "./storage";
 import { insertUserProgressSchema, insertGameSettingsSchema } from "../shared/schema";
 import { z } from "zod";
 import { generateGameSession } from "./gameService";
@@ -86,7 +86,17 @@ export function setupRoutes(app: Express): void {
       res.json(normalized);
     } catch (error) {
       console.error('Error in GET /api/portals:', error);
-      res.status(500).json({ message: "Failed to fetch portals" });
+      // Temporary fallback: if DB/storage fails, return in-memory default portals so the frontend can work.
+      try {
+        const fallback = new MemStorage();
+        const portals = await fallback.getPortals();
+        const normalized = portals.map(p => ({ ...p, variantSettings: (p as any).variantSettings || {} }));
+        res.setHeader('X-Storage-Fallback', 'mem');
+        return res.json(normalized);
+      } catch (fallbackErr) {
+        console.error('Fallback MemStorage also failed:', fallbackErr);
+        return res.status(500).json({ message: "Failed to fetch portals" });
+      }
     }
   });
 
