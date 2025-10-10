@@ -52,6 +52,11 @@ app.get('/test', (req, res) => {
   res.json({ message: 'Server is working!' });
 });
 
+// Health Check рутер за Render и други load balancers
+app.get('/', (req, res) => {
+  res.status(200).json({ status: 'ok', message: 'Server is alive!' });
+});
+
 // Commented out error handler to test
 // app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 //     const status = err.status || err.statusCode || 500;
