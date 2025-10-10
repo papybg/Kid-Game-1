@@ -62,6 +62,6 @@ app.get('/test', (req, res) => {
 
 const port = parseInt(process.env.PORT || '3005');
 
-app.listen(port, '127.0.0.1', () => {
-  console.log(`✅ [express] API server is listening on http://localhost:${port}`);
+app.listen(port, () => {
+  console.log(`✅ [express] API server is listening on port ${port}`);
 });
