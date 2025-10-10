@@ -79,22 +79,27 @@ export function setupRoutes(app: Express): void {
   // Всички останали рутери...
   app.get("/api/portals", async (req, res) => {
     try {
+      console.log('GET /api/portals - resolving storage...');
       const storage = await getStorage();
+      console.log('GET /api/portals - storage resolved:', storage?.constructor?.name || typeof storage);
       const portals = await storage.getPortals();
+      console.log('GET /api/portals - portals fetched, count=', Array.isArray(portals) ? portals.length : 'unknown');
       // Ensure variantSettings is always present so UI can rely on it
       const normalized = portals.map(p => ({ ...p, variantSettings: (p as any).variantSettings || {} }));
       res.json(normalized);
     } catch (error) {
-      console.error('Error in GET /api/portals:', error);
+  console.error('Error in GET /api/portals:', (error as any) && ((error as any).stack || (error as any)));
       // Temporary fallback: if DB/storage fails, return in-memory default portals so the frontend can work.
       try {
+        console.log('GET /api/portals - attempting MemStorage fallback');
         const fallback = new MemStorage();
         const portals = await fallback.getPortals();
+        console.log('GET /api/portals - fallback portals count=', portals.length);
         const normalized = portals.map(p => ({ ...p, variantSettings: (p as any).variantSettings || {} }));
         res.setHeader('X-Storage-Fallback', 'mem');
         return res.json(normalized);
       } catch (fallbackErr) {
-        console.error('Fallback MemStorage also failed:', fallbackErr);
+  console.error('Fallback MemStorage also failed:', (fallbackErr as any) && ((fallbackErr as any).stack || (fallbackErr as any)));
         return res.status(500).json({ message: "Failed to fetch portals" });
       }
     }
