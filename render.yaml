@@ -16,4 +16,4 @@ services:
         value: "<SET IN RENDER DASHBOARD>"
     autoDeploy: true
     instanceType: "starter"
-    healthCheckPath: "/api/portals"
+  healthCheckPath: "/"
