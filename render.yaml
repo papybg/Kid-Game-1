@@ -4,8 +4,8 @@ services:
     env: node
     rootDir: .
     plan: free
-    buildCommand: "npm ci && npm run build:render"
-    startCommand: "npm run start:render"
+  buildCommand: "npm ci --include=dev"
+  startCommand: "npx tsx server/index.ts"
     envVars:
       - key: NODE_ENV
         value: production
