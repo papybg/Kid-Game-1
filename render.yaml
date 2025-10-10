@@ -2,10 +2,12 @@ services:
   - type: web
     name: kidgame1backend
     env: node
+    repo: "https://github.com/papybg/Kid-Game-1.git"
+    branch: "wip/add7e52"
     rootDir: .
     plan: free
-  buildCommand: "npm ci --include=dev"
-  startCommand: "npx tsx server/index.ts"
+    buildCommand: "npm ci --include=dev"
+    startCommand: "npx tsx server/index.ts"
     envVars:
       - key: NODE_ENV
         value: production
