@@ -24,9 +24,21 @@ if ((process.env.NODE_ENV || 'development') !== 'production') {
   allowedOrigins.push('http://localhost:8080', 'http://127.0.0.1:8080');
 }
 
-// Temporarily enable permissive CORS for debugging client requests.
-// IMPORTANT: revert this to a restricted configuration after verification.
-app.use(cors());
+// Use a restricted CORS configuration: allow only known origins.
+const corsOptions = {
+  origin: function (origin: any, callback: any) {
+    // Allow non-browser requests (curl, server-to-server) which have no origin
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      return callback(null, true);
+    }
+    // For disallowed origins, return a proper CORS error message
+    return callback(new Error('Not allowed by CORS'));
+  },
+  optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions));
 
 // setupRoutes добавя всички API рутери
 setupRoutes(app);
