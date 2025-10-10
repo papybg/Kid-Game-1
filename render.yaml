@@ -1,5 +1,18 @@
 services:
   - type: web
+    name: kidgame1backend
+    env: node
+    rootDir: .
+    plan: free
+    buildCommand: "npm ci && npm run build"
+    startCommand: "npm run start"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        # Placeholder: DO NOT commit real credentials. Set this value in the Render dashboard or via secrets.
+        value: "<SET IN RENDER DASHBOARD>"services:
+  - type: web
     name: kidgame-backend
     env: node
     repo: $REPO # replace with your repo if you want to use this file for automatic creation
