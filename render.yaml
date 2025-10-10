@@ -4,30 +4,14 @@ services:
     env: node
     rootDir: .
     plan: free
-    buildCommand: "npm ci && npm run build"
-    startCommand: "npm run start"
+    buildCommand: "npm ci && npm run build:render"
+    startCommand: "npm run start:render"
     envVars:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
         # Placeholder: DO NOT commit real credentials. Set this value in the Render dashboard or via secrets.
-        value: "<SET IN RENDER DASHBOARD>"services:
-  - type: web
-    name: kidgame-backend
-    env: node
-    repo: $REPO # replace with your repo if you want to use this file for automatic creation
-    branch: main
-    rootDir: .
-    # Ensure devDependencies (vite, esbuild) are installed before running the build
-    # Some platforms install only production deps by default, so we explicitly
-    # install dev deps first to make vite available for the build step.
-    buildCommand: "npm install --include=dev && npm run build"
-    startCommand: "npm run start"
+        value: "<SET IN RENDER DASHBOARD>"
     autoDeploy: true
     instanceType: "starter"
-    envVars:
-      - key: ALLOWED_ORIGINS
-        value: "https://68c7757db1fa1c0008f5c003--kid-game-1.netlify.app"
-      - key: NPM_CONFIG_PRODUCTION
-        value: "false"
     healthCheckPath: "/api/portals"

@@ -14,16 +14,25 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// За локална разработка, позволяваме заявки от Vite сървъра на порт 8080 и 8081
-const allowedOrigins = ['https://bgm-design.com', 'https://kid-game-1.vercel.app']; // Add your exact Vercel address if different
+// Build allowed origins list from env plus sensible defaults for dev
+const defaultOrigins = ['https://bgm-design.com', 'https://kid-game-1.vercel.app'];
+const envOrigins = process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim()).filter(Boolean) : [];
+const allowedOrigins = Array.from(new Set([...defaultOrigins, ...envOrigins]));
+
+// Always allow localhost for local development (Vite client)
+if ((process.env.NODE_ENV || 'development') !== 'production') {
+  allowedOrigins.push('http://localhost:8080', 'http://127.0.0.1:8080');
+}
 
 const corsOptions = {
   origin: function (origin: any, callback: any) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+    // Allow non-browser requests (curl, server-to-server) which have no origin
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      return callback(null, true);
     }
+    // For disallowed origins, return a proper CORS error message
+    return callback(new Error('Not allowed by CORS'));
   },
   optionsSuccessStatus: 200,
 };
