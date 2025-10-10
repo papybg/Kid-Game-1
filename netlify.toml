@@ -1,7 +1,7 @@
 [build]
-  base = "."
-  publish = "dist/public"
-  command = "npm run build"
+  base = "client"
+  publish = "client/dist"
+  command = "npm ci && npm run build"
 
 [build.environment]
   VITE_API_BASE = "https://kidgame1backend.onrender.com"
