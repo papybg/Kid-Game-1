@@ -3,8 +3,9 @@ import { ArrowLeft, Moon, Sun, Star, PuzzleIcon } from "lucide-react";
 import { useTheme } from "../components/theme-provider";
 import { useQuery } from "@tanstack/react-query";
 import { LoadingSpinner } from "../components/ui/loading-spinner";
-import { getImageUrl } from "@/utils/image-helpers";
 import type { Portal } from "@shared/schema";
+// 👇 НОВ РЕД 1: Импортваме "умния" скрипт
+import { getImageUrl } from "../utils/image-helpers";
 
 interface PortalSelectionProps {
   onBackToWelcome: () => void;
@@ -95,7 +96,8 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
             >
               <div className="relative">
                 <img
-                  src={getImageUrl(portal.icon_file_name)}
+                  // 👇 НОВ РЕД 2: Използваме "умния" скрипт
+                  src={getImageUrl(portal.icon)}
                   alt={portal.name}
                   className="w-full h-48 object-contain"
                 />
@@ -127,7 +129,7 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
           <div className="bg-card rounded-2xl overflow-hidden shadow-lg opacity-50 animate-slide-up" style={{ animationDelay: "0.1s" }}>
             <div className="relative">
               <img
-                src="/images/placeholder-1.png"
+                src="https://images.unsplash.com/photo-1544551763-46a013bb70d5?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&h=300"
                 alt="Подводен свят"
                 className="w-full h-48 object-contain"
               />
@@ -147,7 +149,7 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
           <div className="bg-card rounded-2xl overflow-hidden shadow-lg opacity-50 animate-slide-up" style={{ animationDelay: "0.2s" }}>
             <div className="relative">
               <img
-                src="/images/placeholder-2.png"
+                src="https://images.unsplash.com/photo-1516426122078-c23e76319801?ixlib=rb-4.0.3&auto=format&fit=crop&w=600&h=300"
                 alt="Африканска савана"
                 className="w-full h-48 object-contain"
               />
