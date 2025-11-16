@@ -160,3 +160,4 @@ attached_assets/
 .env.development.local
 .env.test.local
 .env.production.local
+client/src/tailwind.output.css

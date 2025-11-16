@@ -1,20 +1,10 @@
 @echo off
-echo Checking for processes using ports 5173 and 3005...
+echo Starting development servers for Kid-Game-1...
+echo.
+echo This will start the Backend on port 3005 and the Frontend on port 8080.
+echo It will first attempt to free up these ports if they are in use.
+echo.
 
-REM Kill processes on port 8080 (Vite client)
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr :8080') do (
-    echo Killing process %%a on port 8080
-    taskkill /PID %%a /F >nul 2>&1
-)
-
-REM Kill processes on port 3005 (Express server)
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr :3005') do (
-    echo Killing process %%a on port 3005
-    taskkill /PID %%a /F >nul 2>&1
-)
-
-echo Waiting 3 seconds for ports to be freed...
-timeout /t 3 /nobreak >nul
-
-echo Starting development servers...
+REM Navigate to the project root and run the main dev script
+cd /d "c:\dev\Kid-Game-1"
 npm run dev
