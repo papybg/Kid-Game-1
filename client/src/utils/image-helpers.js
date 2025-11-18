@@ -5,7 +5,7 @@ const CLOUDINARY_CLOUD_NAME = 'YOUR_CLOUD_NAME_HERE';
  * Генерира пълен Cloudinary URL от public ID (file_name).
  * Добавя автоматични оптимизации (формат, качество, ширина).
  */
-export function getImageUrl(publicId: string): string {
+export function getImageUrl(publicId) {
   // Ако по някаква причина ID-то е празно, върни placeholder
   if (!publicId) {
     // Промени това, ако твоят placeholder е на друго място
