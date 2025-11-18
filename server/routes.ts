@@ -5,11 +5,22 @@ import { insertUserProgressSchema, insertGameSettingsSchema } from "../shared/sc
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  function normalizeIconValue(icon?: string | null) {
+    if (!icon) return null;
+    // If already a full URL, fix malformed protocol and return
+    if (/^https?:\/\//i.test(icon)) {
+      return icon.replace('https:/', 'https://');
+    }
+    const cloud = process.env.CLOUDINARY_CLOUD_NAME || 'db8o7so6j';
+    return `https://res.cloudinary.com/${cloud}/image/upload/${icon}`;
+  }
+
   // Get all portals
   app.get("/api/portals", async (req, res) => {
     try {
       const portals = await storage.getPortals();
-      res.json(portals);
+      const withUrls = portals.map(p => ({ ...p, icon_url: normalizeIconValue((p as any).icon) }));
+      res.json(withUrls);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch portals" });
     }
@@ -22,7 +33,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!portal) {
         return res.status(404).json({ message: "Portal not found" });
       }
-      res.json(portal);
+      res.json({ ...portal, icon_url: normalizeIconValue((portal as any).icon) });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch portal" });
     }
