@@ -12,10 +12,17 @@ export function getImageUrl(publicId: string): string {
     return '/placeholder-1.png'; 
   }
 
-  // Ако някъде е останал стар, пълен URL, просто го върни
-  if (publicId.startsWith('http://') || publicId.startsWith('https://')) {
-    return publicId;
-  }
+    // If it's already a full URL, return it (but normalize malformed protocol)
+    if (publicId.startsWith('http://') || publicId.startsWith('https://') || publicId.startsWith('http:/') || publicId.startsWith('https:/')) {
+      // Normalize accidental single-slash protocols like `https:/res...` => `https://res...`
+      if (publicId.startsWith('http:/') && !publicId.startsWith('http://')) {
+        publicId = publicId.replace(/^http:\/+/i, 'http://');
+      }
+      if (publicId.startsWith('https:/') && !publicId.startsWith('https://')) {
+        publicId = publicId.replace(/^https:\/+/i, 'https://');
+      }
+      return publicId;
+    }
 
   // Това са стандартни оптимизации на Cloudinary:
   // f_auto = автоматичен формат (webp, avif)
