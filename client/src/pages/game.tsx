@@ -299,7 +299,19 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
     );
   }
 
-  const backgroundUrl = isMobile ? layout.backgroundSmall : layout.backgroundLarge;
+  const _rawBackgroundUrl = isMobile ? (layout as any).backgroundSmall_url || layout.backgroundSmall : (layout as any).backgroundLarge_url || layout.backgroundLarge;
+  let backgroundUrl = _rawBackgroundUrl;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { getImageUrl } = require('@/utils/image-helpers');
+    if (_rawBackgroundUrl) {
+      // normalize public IDs or full urls
+      backgroundUrl = getImageUrl(_rawBackgroundUrl);
+    }
+  } catch (e) {
+    // if require fails, keep raw value
+    backgroundUrl = _rawBackgroundUrl;
+  }
 
   return (
     <div className="fixed inset-0 z-30 w-screen h-screen">

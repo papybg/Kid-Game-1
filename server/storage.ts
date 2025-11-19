@@ -55,7 +55,8 @@ export class MemStorage implements IStorage {
     const defaultPortal: Portal = {
       id: "dolina",
       name: "Зелена долина",
-      icon: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&h=200",
+      // КОРЕКЦИЯ: Използваме Public ID вместо пълен URL
+      icon: "game-assets/dolina-icon", 
       layouts: ["d1"],
       difficulty: "easy",
       isLocked: false,
@@ -68,7 +69,8 @@ export class MemStorage implements IStorage {
       {
         id: 1,
         name: "Котка",
-        image: "/images/cat.png",
+        // КОРЕКЦИЯ: Използваме Public ID
+        image: "game-assets/cat",
         index: "h",
         category: "домашни",
         createdAt: new Date(),
@@ -76,7 +78,8 @@ export class MemStorage implements IStorage {
       {
         id: 2,
         name: "Куче",
-        image: "/images/dog.png",
+        // КОРЕКЦИЯ: Използваме Public ID
+        image: "game-assets/dog",
         index: "h",
         category: "домашни",
         createdAt: new Date(),
@@ -84,7 +87,8 @@ export class MemStorage implements IStorage {
       {
         id: 3,
         name: "Кокошка",
-        image: "/images/chicken.png",
+        // КОРЕКЦИЯ: Използваме Public ID
+        image: "game-assets/chicken",
         index: "p",
         category: "селскостопански",
         createdAt: new Date(),
@@ -92,7 +96,8 @@ export class MemStorage implements IStorage {
       {
         id: 4,
         name: "Влак",
-        image: "/images/train.png",
+        // КОРЕКЦИЯ: Използваме Public ID
+        image: "game-assets/train",
         index: "i",
         category: "транспорт",
         createdAt: new Date(),
@@ -100,7 +105,8 @@ export class MemStorage implements IStorage {
       {
         id: 5,
         name: "Автобус",
-        image: "/images/bus.png",
+        // КОРЕКЦИЯ: Използваме Public ID
+        image: "game-assets/bus",
         index: "r",
         category: "транспорт",
         createdAt: new Date(),
@@ -108,7 +114,8 @@ export class MemStorage implements IStorage {
       {
         id: 6,
         name: "Врана",
-        image: "/images/crow.png",
+        // КОРЕКЦИЯ: Използваме Public ID
+        image: "game-assets/crow",
         index: "s",
         category: "птици",
         createdAt: new Date(),
@@ -120,17 +127,19 @@ export class MemStorage implements IStorage {
       {
         id: 7,
         name: "Крава",
-        image: "/images/cow.png",
-        index: "p", 
+        // КОРЕКЦИЯ: Използваме Public ID
+        image: "game-assets/cow",
+        index: "p",
         category: "селскостопански",
         createdAt: new Date(),
       },
       {
         id: 8,
         name: "Самолет",
-        image: "/images/airplane.png",
+        // КОРЕКЦИЯ: Използваме Public ID
+        image: "game-assets/airplane",
         index: "s",
-        category: "транспорт", 
+        category: "транспорт",
         createdAt: new Date(),
       },
     ];
@@ -144,8 +153,9 @@ export class MemStorage implements IStorage {
     const defaultLayout: GameLayout = {
       id: "d1",
       name: "Зелена долина - Ниво 1",
-      backgroundLarge: "/images/backgrounds/dolina-large.png",
-      backgroundSmall: "/images/backgrounds/dolina-small.png",
+      // КОРЕКЦИЯ: Използваме Public ID вместо локален път
+      backgroundLarge: "game-assets/dolina-large",
+      backgroundSmall: "game-assets/dolina-small",
       slots: [
         { index: ["s"], position: { top: "25%", left: "15%" }, diameter: "11%" },
         { index: ["s"], position: { top: "23%", left: "80%" }, diameter: "11%" },

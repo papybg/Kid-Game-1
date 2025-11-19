@@ -1,8 +1,10 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
-import { getDirname } from "./utils";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const getDirname = (metaUrl: string) => path.dirname(fileURLToPath(metaUrl));
 
 const __dirname = getDirname(import.meta.url);
 
@@ -55,10 +57,11 @@ app.use((req, res, next) => {
         logLine = logLine.slice(0, 79) + "…";
       }
 
-      log(logLine);
+      // Заместваме log функцията от премахнатия vite.ts файл с console.log
+      // Може да се добави по-сложна логика за логване при нужда
+      console.log(`[express] ${logLine}`);
     }
   });
-
   next();
 });
 
@@ -73,29 +76,12 @@ app.use((req, res, next) => {
     throw err;
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    try {
-      serveStatic(app);
-    } catch (err) {
-      // Do not crash the process if the client build is missing. Start the API only.
-      console.warn(
-        "Warning: serveStatic failed — starting API without client static files.",
-        err instanceof Error ? err.message : err,
-      );
-    }
-  }
-
   // ALWAYS serve the app on the port specified in the environment variable PORT
   // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '3005', 10);
   server.listen(port, () => {
-    log(`serving on port ${port}`);
+    console.log(`[express] serving on port ${port}`);
   });
 })();

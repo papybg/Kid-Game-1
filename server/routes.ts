@@ -5,11 +5,39 @@ import { insertUserProgressSchema, insertGameSettingsSchema } from "../shared/sc
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  function normalizeIconValue(icon?: string | null) {
+    if (!icon) return null;
+    const cloud = process.env.CLOUDINARY_CLOUD_NAME || 'db8o7so6j';
+
+    // If the string contains a Cloudinary URL anywhere, extract and return it
+    const cloudMatch = icon.match(/https?:\/\/res\.cloudinary\.com\/.*$/i);
+    if (cloudMatch) {
+      return cloudMatch[0].replace('https:/', 'https://');
+    }
+
+    // Remove accidental local prefix like '/images/backgrounds/' or '/images/'
+    let cleaned = icon.replace(/^\/images\/backgrounds\//i, '').replace(/^\/images\//i, '');
+
+    // If cleaned is already a full URL, normalize and return
+    if (/^https?:\/\//i.test(cleaned)) {
+      return cleaned.replace('https:/', 'https://');
+    }
+
+    // If original started with http(s) but didn't match cloud pattern, normalize it
+    if (/^https?:\/\//i.test(icon)) {
+      return icon.replace('https:/', 'https://');
+    }
+
+    // Otherwise treat value as a Cloudinary public ID
+    return `https://res.cloudinary.com/${cloud}/image/upload/${cleaned}`;
+  }
+
   // Get all portals
   app.get("/api/portals", async (req, res) => {
     try {
       const portals = await storage.getPortals();
-      res.json(portals);
+      const withUrls = portals.map(p => ({ ...p, icon_url: normalizeIconValue((p as any).icon) }));
+      res.json(withUrls);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch portals" });
     }
@@ -22,7 +50,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!portal) {
         return res.status(404).json({ message: "Portal not found" });
       }
-      res.json(portal);
+      res.json({ ...portal, icon_url: normalizeIconValue((portal as any).icon) });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch portal" });
     }
@@ -45,7 +73,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!layout) {
         return res.status(404).json({ message: "Layout not found" });
       }
-      res.json(layout);
+      // Normalize background fields to absolute URLs
+      const backgroundLarge = (layout as any).backgroundLarge;
+      const backgroundSmall = (layout as any).backgroundSmall;
+      const normalized = {
+        ...layout,
+        backgroundLarge_url: normalizeIconValue(backgroundLarge),
+        backgroundSmall_url: normalizeIconValue(backgroundSmall),
+      };
+      res.json(normalized);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch layout" });
     }
