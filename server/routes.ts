@@ -73,7 +73,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!layout) {
         return res.status(404).json({ message: "Layout not found" });
       }
-      res.json(layout);
+      // Normalize background fields to absolute URLs
+      const backgroundLarge = (layout as any).backgroundLarge;
+      const backgroundSmall = (layout as any).backgroundSmall;
+      const normalized = {
+        ...layout,
+        backgroundLarge_url: normalizeIconValue(backgroundLarge),
+        backgroundSmall_url: normalizeIconValue(backgroundSmall),
+      };
+      res.json(normalized);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch layout" });
     }

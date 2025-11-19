@@ -299,7 +299,7 @@ export default function Game({ portal, onBackToMenu, onWin }: GameProps) {
     );
   }
 
-  const _rawBackgroundUrl = isMobile ? layout.backgroundSmall : layout.backgroundLarge;
+  const _rawBackgroundUrl = isMobile ? (layout as any).backgroundSmall_url || layout.backgroundSmall : (layout as any).backgroundLarge_url || layout.backgroundLarge;
   let backgroundUrl = _rawBackgroundUrl;
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
