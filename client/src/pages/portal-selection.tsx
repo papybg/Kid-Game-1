@@ -95,7 +95,7 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
             >
               <div className="relative">
                 <img
-                  src={getImageUrl((portal as any).icon_file_name || (portal as any).icon)}
+                  src={(portal as any).icon_url || getImageUrl((portal as any).icon_file_name || (portal as any).icon)}
                   alt={portal.name}
                   className="w-full h-48 object-contain"
                 />
