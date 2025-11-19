@@ -7,12 +7,29 @@ import { z } from "zod";
 export async function registerRoutes(app: Express): Promise<Server> {
   function normalizeIconValue(icon?: string | null) {
     if (!icon) return null;
-    // If already a full URL, fix malformed protocol and return
+    const cloud = process.env.CLOUDINARY_CLOUD_NAME || 'db8o7so6j';
+
+    // If the string contains a Cloudinary URL anywhere, extract and return it
+    const cloudMatch = icon.match(/https?:\/\/res\.cloudinary\.com\/.*$/i);
+    if (cloudMatch) {
+      return cloudMatch[0].replace('https:/', 'https://');
+    }
+
+    // Remove accidental local prefix like '/images/backgrounds/' or '/images/'
+    let cleaned = icon.replace(/^\/images\/backgrounds\//i, '').replace(/^\/images\//i, '');
+
+    // If cleaned is already a full URL, normalize and return
+    if (/^https?:\/\//i.test(cleaned)) {
+      return cleaned.replace('https:/', 'https://');
+    }
+
+    // If original started with http(s) but didn't match cloud pattern, normalize it
     if (/^https?:\/\//i.test(icon)) {
       return icon.replace('https:/', 'https://');
     }
-    const cloud = process.env.CLOUDINARY_CLOUD_NAME || 'db8o7so6j';
-    return `https://res.cloudinary.com/${cloud}/image/upload/${icon}`;
+
+    // Otherwise treat value as a Cloudinary public ID
+    return `https://res.cloudinary.com/${cloud}/image/upload/${cleaned}`;
   }
 
   // Get all portals
