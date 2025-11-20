@@ -1,27 +1,37 @@
-// Вземи това име от твоя Cloudinary Dashboard
-const CLOUDINARY_CLOUD_NAME = 'YOUR_CLOUD_NAME_HERE';
+// Взех това име от твоите логове за грешки (db8o7so6j)
+const CLOUDINARY_CLOUD_NAME = 'db8o7so6j'; 
 
 /**
- * Генерира пълен Cloudinary URL от public ID (file_name).
- * Добавя автоматични оптимизации (формат, качество, ширина).
+ * Генерира пълен Cloudinary URL или връща поправен линк.
  */
-export function getImageUrl(publicId: string): string {
-  // Ако по някаква причина ID-то е празно, върни placeholder
+export function getImageUrl(publicId: string | null | undefined): string {
+  // 1. Ако няма ID, връщаме placeholder
   if (!publicId) {
-    // Промени това, ако твоят placeholder е на друго място
-    return '/placeholder-1.png'; 
+    return '/images/placeholder-1.png'; 
   }
 
-  // Ако някъде е останал стар, пълен URL, просто го върни
-  if (publicId.startsWith('http://') || publicId.startsWith('https://')) {
-    return publicId;
+  // 2. Ако вече е пълен URL (започва с http/https)
+  if (publicId.startsWith('http')) {
+    let cleanUrl = publicId;
+
+    // ФИКС: Оправяне на "https:/res..." (една наклонена черта), което видяхме в лога
+    if (cleanUrl.includes('https:/') && !cleanUrl.includes('https://')) {
+        cleanUrl = cleanUrl.replace('https:/', 'https://');
+    }
+    if (cleanUrl.includes('http:/') && !cleanUrl.includes('http://')) {
+        cleanUrl = cleanUrl.replace('http:/', 'http://');
+    }
+
+    return cleanUrl;
   }
 
-  // Това са стандартни оптимизации на Cloudinary:
-  // f_auto = автоматичен формат (webp, avif)
-  // q_auto = автоматично качество
-  // w_600 = ширина 600px (промени, ако искаш)
-  // c_fit = запази пропорциите
+  // 3. Ако е локален път (започва с /images или /assets), връщаме го както е
+  // Това предпазва от грешката, ако някой файл си е локален.
+  if (publicId.startsWith('/') || publicId.startsWith('assets')) {
+      return publicId;
+  }
+
+  // 4. Генериране на нов Cloudinary URL (ако е само име на файл)
   const transformations = 'f_auto,q_auto,w_600,c_fit';
 
   return `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/${transformations}/${publicId}`;
