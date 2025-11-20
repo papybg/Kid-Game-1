@@ -85,7 +85,28 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
       {/* Portal Container */}
       <div className="flex-1 overflow-y-auto">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-          {portals?.map((portal: Portal, index: number) => (
+          {portals?.map((portal: Portal, index: number) => {
+            
+            // --- ТУК Е ФИКСЪТ ЗА АДРЕСИТЕ ---
+            // 1. Взимаме суровото име на файла или линка
+            const rawIcon = (portal as any).icon_file_name || (portal as any).icon;
+            const directUrl = (portal as any).icon_url;
+
+            // 2. Логика за определяне на правилния източник
+            let finalImgSrc;
+            if (directUrl) {
+                // Ако има директен URL от базата, ползваме него
+                finalImgSrc = directUrl;
+            } else if (rawIcon && (rawIcon.startsWith('http') || rawIcon.startsWith('https'))) {
+                // Ако "името на файла" всъщност е пълен линк, ползваме го директно (без getImageUrl)
+                finalImgSrc = rawIcon;
+            } else {
+                // В краен случай ползваме локалния helper
+                finalImgSrc = getImageUrl(rawIcon);
+            }
+            // --------------------------------
+
+            return (
             <div
               key={portal.id}
               className="bg-card rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 cursor-pointer animate-slide-up"
@@ -95,8 +116,7 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
             >
               <div className="relative">
                 <img
-                  src={(portal as any).icon_url || getImageUrl((portal as any).icon_file_name || (portal as any).icon)}
-                  
+                  src={finalImgSrc}
                   alt={portal.name}
                   className="w-full h-48 object-contain"
                 />
@@ -122,7 +142,8 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
                 </div>
               </div>
             </div>
-          ))}
+          );
+          })}
           
           {/* Coming Soon Cards */}
           <div className="bg-card rounded-2xl overflow-hidden shadow-lg opacity-50 animate-slide-up" style={{ animationDelay: "0.1s" }}>
