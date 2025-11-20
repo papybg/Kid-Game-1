@@ -3,7 +3,6 @@ import { ArrowLeft, Moon, Sun, Star, PuzzleIcon } from "lucide-react";
 import { useTheme } from "../components/theme-provider";
 import { useQuery } from "@tanstack/react-query";
 import { LoadingSpinner } from "../components/ui/loading-spinner";
-// Премахваме зависимостта от getImageUrl за основната логика, за да не прави проблеми
 import type { Portal } from "@shared/schema";
 
 interface PortalSelectionProps {
@@ -11,46 +10,47 @@ interface PortalSelectionProps {
   onSelectPortal: (portal: Portal) => void;
 }
 
-// --- ЯДРЕНО РЕШЕНИЕ: Нова функция за обработка на адресите ---
-// Тази функция стои извън компонента, за да е изолирана и сигурна.
-function resolvePortalImage(portal: any): string {
-  // 1. Взимаме всички възможни полета
-  const rawValue = portal.icon_url || portal.icon_file_name || portal.icon;
+// --- ХИРУРГИЧЕСКА ФУНКЦИЯ (Вътрешна) ---
+const fixUrl = (raw: any): string => {
+  // 1. Превръщаме в текст и махаме празни места
+  let str = String(raw || "").trim();
+  
+  if (!str || str === "undefined" || str === "null") return "/images/placeholder-1.png";
 
-  // Debug: Виж това в конзолата (F12), за да разберем какво идва от базата
-  console.log(`Processing portal: ${portal.name}`, rawValue);
+  console.log("Checking URL:", str); // Виж това в конзолата (F12)
 
-  if (!rawValue) return "/images/placeholder-1.png"; // Fallback ако няма нищо
-
-  // 2. Проверка: Съдържа ли "http" (независимо къде и как)
-  if (String(rawValue).includes("http")) {
-    // Намираме къде започва истинският линк
-    const httpIndex = rawValue.indexOf("http");
-    let cleanUrl = rawValue.substring(httpIndex);
-
-    // ХАК: Оправяме счупени https:/ (с една наклонена), което се вижда в лога ти
-    if (cleanUrl.includes("https:/") && !cleanUrl.includes("https://")) {
-      cleanUrl = cleanUrl.replace("https:/", "https://");
+  // 2. АКО СЪДЪРЖА "http" (независимо къде)
+  const httpIndex = str.indexOf("http");
+  if (httpIndex !== -1) {
+    // Изрязваме всичко преди "http" (махаме /images/backgrounds/ ако се е залепило)
+    let clean = str.substring(httpIndex);
+    
+    // Оправяме печатната грешка от базата (https:/ -> https://)
+    if (clean.startsWith("https:/") && !clean.startsWith("https://")) {
+        clean = clean.replace("https:/", "https://");
+    }
+    if (clean.startsWith("http:/") && !clean.startsWith("http://")) {
+        clean = clean.replace("http:/", "http://");
     }
     
-    return cleanUrl;
+    return clean;
   }
 
-  // 3. Ако няма http, значи е локален файл.
-  // Тук ръчно добавяме пътя, БЕЗ да ползваме външни функции.
-  // Уверяваме се, че няма двойни наклонени черти.
-  const cleanName = rawValue.startsWith("/") ? rawValue.substring(1) : rawValue;
-  return `/images/backgrounds/${cleanName}`;
-}
-// ------------------------------------------------------------
+  // 3. Ако няма http, значи е локален файл
+  // Махаме водещата наклонена черта за всеки случай
+  const filename = str.startsWith("/") ? str.substring(1) : str;
+  return `/images/backgrounds/${filename}`;
+};
+// ----------------------------------------
 
 export default function PortalSelection({ onBackToWelcome, onSelectPortal }: PortalSelectionProps) {
   const { theme, setTheme } = useTheme();
 
   const { data: portals = [], isLoading, error } = useQuery<Portal[]>({
     queryKey: ['api/portals'],
-    retry: 2,
-    staleTime: 0, // ВАЖНО: Изключваме кеша, за да сме сигурни, че взимаме новото
+    // Спираме кеша на заявката за всеки случай
+    staleTime: 0,
+    cacheTime: 0,
   });
 
   const toggleTheme = () => {
@@ -73,9 +73,6 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
       <div className="fixed inset-0 z-40 flex items-center justify-center bg-background">
         <div className="text-center space-y-4">
           <p className="text-destructive">Грешка при зареждане на световете:</p>
-          <pre className="text-sm bg-gray-100 p-4 rounded">
-            {error instanceof Error ? error.message : JSON.stringify(error, null, 2)}
-          </pre>
           <Button onClick={() => window.location.reload()}>Опитай отново</Button>
         </div>
       </div>
@@ -84,15 +81,8 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
 
   return (
     <div className="fixed inset-0 z-40 flex flex-col p-4 bg-background">
-      {/* Header */}
       <div className="flex items-center justify-between mb-8">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={onBackToWelcome}
-          className="w-12 h-12"
-          data-testid="button-back-to-welcome"
-        >
+        <Button variant="outline" size="icon" onClick={onBackToWelcome} className="w-12 h-12">
           <ArrowLeft className="w-5 h-5" />
         </Button>
         
@@ -100,28 +90,19 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
           Избери световете
         </h1>
         
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={toggleTheme}
-          className="w-12 h-12"
-          data-testid="button-theme-toggle"
-        >
-          {theme === "dark" ? (
-            <Sun className="w-5 h-5" />
-          ) : (
-            <Moon className="w-5 h-5" />
-          )}
+        <Button variant="outline" size="icon" onClick={toggleTheme} className="w-12 h-12">
+          {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
         </Button>
       </div>
       
-      {/* Portal Container */}
       <div className="flex-1 overflow-y-auto">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
           {portals?.map((portal: Portal, index: number) => {
             
-            // Извикваме новата функция
-            const finalImgSrc = resolvePortalImage(portal);
+            // Взимаме суровите данни
+            const rawIcon = (portal as any).icon_url || (portal as any).icon_file_name || (portal as any).icon;
+            // Поправяме ги на място
+            const finalSrc = fixUrl(rawIcon);
 
             return (
             <div
@@ -129,26 +110,21 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
               className="bg-card rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-2 cursor-pointer animate-slide-up"
               style={{ animationDelay: `${index * 0.1}s` }}
               onClick={() => onSelectPortal(portal)}
-              data-testid={`portal-card-${portal.id}`}
             >
               <div className="relative">
                 <img
-                  src={finalImgSrc}
+                  src={finalSrc}
                   alt={portal.name}
                   className="w-full h-48 object-cover"
                   onError={(e) => {
-                    // Защита: Ако и този URL гръмне, слагаме placeholder
+                    console.error("Image error for:", finalSrc);
                     e.currentTarget.src = "/images/placeholder-1.png";
-                    console.error("Image failed to load:", finalImgSrc);
                   }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
                 <div className="absolute bottom-4 left-4 text-white">
                   <h3 className="font-display font-semibold text-xl">{portal.name}</h3>
                   <p className="text-sm text-gray-200">Открий животните в природата</p>
-                </div>
-                <div className="absolute top-4 right-4 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-                  <span className="text-white text-xs">🌿</span>
                 </div>
               </div>
               <div className="p-4">
@@ -167,65 +143,17 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
           );
           })}
           
-          {/* Coming Soon Cards */}
-          <div className="bg-card rounded-2xl overflow-hidden shadow-lg opacity-50 animate-slide-up" style={{ animationDelay: "0.1s" }}>
-            <div className="relative">
-              <img
-                src="/images/placeholder-1.png"
-                alt="Подводен свят"
-                className="w-full h-48 object-contain"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
-              <div className="absolute bottom-4 left-4 text-white">
-                <h3 className="font-display font-semibold text-xl">Подводен свят</h3>
-                <p className="text-sm text-gray-200">Скоро...</p>
+           {/* Coming Soon Cards - запазени са */}
+           <div className="bg-card rounded-2xl overflow-hidden shadow-lg opacity-50">
+              <div className="relative">
+                 <img src="/images/placeholder-1.png" className="w-full h-48 object-contain" />
+                 <div className="absolute bottom-4 left-4 text-white">
+                    <h3 className="font-display font-semibold text-xl">Подводен свят</h3>
+                    <p>Скоро...</p>
+                 </div>
               </div>
-              <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                  🔒
-                </div>
-              </div>
-            </div>
-          </div>
+           </div>
 
-          <div className="bg-card rounded-2xl overflow-hidden shadow-lg opacity-50 animate-slide-up" style={{ animationDelay: "0.2s" }}>
-            <div className="relative">
-              <img
-                src="/images/placeholder-2.png"
-                alt="Африканска савана"
-                className="w-full h-48 object-contain"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
-              <div className="absolute bottom-4 left-4 text-white">
-                <h3 className="font-display font-semibold text-xl">Африканска савана</h3>
-                <p className="text-sm text-gray-200">Скоро...</p>
-              </div>
-              <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                  🔒
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      {/* Progress Stats */}
-      <div className="mt-8 bg-card rounded-2xl p-6 shadow-lg">
-        <h3 className="font-semibold text-lg mb-4">Твоят прогрес</h3>
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <div>
-            <div className="text-2xl font-bold text-primary">3</div>
-            <div className="text-sm text-muted-foreground">Завършени нива</div>
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-success">85%</div>
-            <div className="text-sm text-muted-foreground">Точност</div>
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-orange-500">12м</div>
-            <div className="text-sm text-muted-foreground">Време за игра</div>
-          </div>
         </div>
       </div>
     </div>
