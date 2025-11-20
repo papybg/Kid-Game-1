@@ -7,7 +7,7 @@ import { ThemeProvider } from "./components/theme-provider";
 import { AudioProvider } from "./components/audio-manager";
 
 import Welcome from "./pages/welcome";
-import PortalSelection from "./pages/portal-selection";
+import PortalSelection from "./pages/WorldSelect";
 import Game from "./pages/game";
 import Win from "./pages/win";
 import AdminPage from "./pages/admin";
