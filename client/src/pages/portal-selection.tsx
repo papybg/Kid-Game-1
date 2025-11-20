@@ -87,22 +87,20 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
           {portals?.map((portal: Portal, index: number) => {
             
-            // --- ТУК Е ФИКСЪТ ЗА АДРЕСИТЕ ---
-            // 1. Взимаме суровото име на файла или линка
-            const rawIcon = (portal as any).icon_file_name || (portal as any).icon;
-            const directUrl = (portal as any).icon_url;
+            // --- НОВ ФИКС (Брутална сила) ---
+            // Взимаме всички възможни източници
+            const possibleUrl = (portal as any).icon_url || (portal as any).icon_file_name || (portal as any).icon;
+            
+            let finalImgSrc = "";
 
-            // 2. Логика за определяне на правилния източник
-            let finalImgSrc;
-            if (directUrl) {
-                // Ако има директен URL от базата, ползваме него
-                finalImgSrc = directUrl;
-            } else if (rawIcon && (rawIcon.startsWith('http') || rawIcon.startsWith('https'))) {
-                // Ако "името на файла" всъщност е пълен линк, ползваме го директно (без getImageUrl)
-                finalImgSrc = rawIcon;
+            // Проверяваме дали има "http" някъде в стринга
+            if (possibleUrl && typeof possibleUrl === 'string' && possibleUrl.includes('http')) {
+                // Ако има http, изрязваме всичко преди него! 
+                // Това оправя проблема "/images/backgrounds/https://..."
+                finalImgSrc = possibleUrl.substring(possibleUrl.indexOf('http'));
             } else {
-                // В краен случай ползваме локалния helper
-                finalImgSrc = getImageUrl(rawIcon);
+                // Ако няма http, значи е локален файл -> ползваме helper-а
+                finalImgSrc = getImageUrl(possibleUrl);
             }
             // --------------------------------
 
@@ -118,7 +116,7 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
                 <img
                   src={finalImgSrc}
                   alt={portal.name}
-                  className="w-full h-48 object-contain"
+                  className="w-full h-48 object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
                 <div className="absolute bottom-4 left-4 text-white">
