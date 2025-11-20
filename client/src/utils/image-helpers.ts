@@ -1,38 +1,37 @@
-// Взех това име от твоите логове за грешки (db8o7so6j)
-const CLOUDINARY_CLOUD_NAME = 'db8o7so6j'; 
+// Tвоето Cloud Name
+const CLOUDINARY_CLOUD_NAME = 'db8o7so6j';
 
-/**
- * Генерира пълен Cloudinary URL или връща поправен линк.
- */
 export function getImageUrl(publicId: string | null | undefined): string {
   // 1. Ако няма ID, връщаме placeholder
   if (!publicId) {
     return '/images/placeholder-1.png'; 
   }
 
-  // 2. Ако вече е пълен URL (започва с http/https)
-  if (publicId.startsWith('http')) {
-    let cleanUrl = publicId;
+  // 2. Превръщаме в стринг за сигурност
+  let path = String(publicId);
 
-    // ФИКС: Оправяне на "https:/res..." (една наклонена черта), което видяхме в лога
-    if (cleanUrl.includes('https:/') && !cleanUrl.includes('https://')) {
-        cleanUrl = cleanUrl.replace('https:/', 'https://');
+  // 3. КЛЮЧОВАТА ПОПРАВКА:
+  // Проверяваме дали започва с "http", БЕЗ да гледаме наклонените черти.
+  if (path.startsWith('http')) {
+    
+    // Ако адресът е счупен (има само една черта), го поправяме
+    if (path.startsWith('https:/') && !path.startsWith('https://')) {
+       return path.replace('https:/', 'https://');
     }
-    if (cleanUrl.includes('http:/') && !cleanUrl.includes('http://')) {
-        cleanUrl = cleanUrl.replace('http:/', 'http://');
+    if (path.startsWith('http:/') && !path.startsWith('http://')) {
+       return path.replace('http:/', 'http://');
     }
 
-    return cleanUrl;
+    // Ако е здрав, го връщаме както е
+    return path;
   }
 
-  // 3. Ако е локален път (започва с /images или /assets), връщаме го както е
-  // Това предпазва от грешката, ако някой файл си е локален.
-  if (publicId.startsWith('/') || publicId.startsWith('assets')) {
-      return publicId;
+  // 4. Ако е локален път (започва с /images или /assets), не го пипаме
+  if (path.startsWith('/') || path.startsWith('assets')) {
+      return path;
   }
 
-  // 4. Генериране на нов Cloudinary URL (ако е само име на файл)
+  // 5. Ако е само име на файл, генерираме Cloudinary линк
   const transformations = 'f_auto,q_auto,w_600,c_fit';
-
-  return `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/${transformations}/${publicId}`;
+  return `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/${transformations}/${path}`;
 }
