@@ -3,7 +3,7 @@ import { ArrowLeft, Moon, Sun, Star, PuzzleIcon } from "lucide-react";
 import { useTheme } from "../components/theme-provider";
 import { useQuery } from "@tanstack/react-query";
 import { LoadingSpinner } from "../components/ui/loading-spinner";
-import { getImageUrl } from "@/utils/image-helpers";
+// Премахваме зависимостта от getImageUrl за основната логика, за да не прави проблеми
 import type { Portal } from "@shared/schema";
 
 interface PortalSelectionProps {
@@ -11,13 +11,46 @@ interface PortalSelectionProps {
   onSelectPortal: (portal: Portal) => void;
 }
 
+// --- ЯДРЕНО РЕШЕНИЕ: Нова функция за обработка на адресите ---
+// Тази функция стои извън компонента, за да е изолирана и сигурна.
+function resolvePortalImage(portal: any): string {
+  // 1. Взимаме всички възможни полета
+  const rawValue = portal.icon_url || portal.icon_file_name || portal.icon;
+
+  // Debug: Виж това в конзолата (F12), за да разберем какво идва от базата
+  console.log(`Processing portal: ${portal.name}`, rawValue);
+
+  if (!rawValue) return "/images/placeholder-1.png"; // Fallback ако няма нищо
+
+  // 2. Проверка: Съдържа ли "http" (независимо къде и как)
+  if (String(rawValue).includes("http")) {
+    // Намираме къде започва истинският линк
+    const httpIndex = rawValue.indexOf("http");
+    let cleanUrl = rawValue.substring(httpIndex);
+
+    // ХАК: Оправяме счупени https:/ (с една наклонена), което се вижда в лога ти
+    if (cleanUrl.includes("https:/") && !cleanUrl.includes("https://")) {
+      cleanUrl = cleanUrl.replace("https:/", "https://");
+    }
+    
+    return cleanUrl;
+  }
+
+  // 3. Ако няма http, значи е локален файл.
+  // Тук ръчно добавяме пътя, БЕЗ да ползваме външни функции.
+  // Уверяваме се, че няма двойни наклонени черти.
+  const cleanName = rawValue.startsWith("/") ? rawValue.substring(1) : rawValue;
+  return `/images/backgrounds/${cleanName}`;
+}
+// ------------------------------------------------------------
+
 export default function PortalSelection({ onBackToWelcome, onSelectPortal }: PortalSelectionProps) {
   const { theme, setTheme } = useTheme();
 
   const { data: portals = [], isLoading, error } = useQuery<Portal[]>({
     queryKey: ['api/portals'],
     retry: 2,
-    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+    staleTime: 0, // ВАЖНО: Изключваме кеша, за да сме сигурни, че взимаме новото
   });
 
   const toggleTheme = () => {
@@ -87,22 +120,8 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
           {portals?.map((portal: Portal, index: number) => {
             
-            // --- НОВ ФИКС (Брутална сила) ---
-            // Взимаме всички възможни източници
-            const possibleUrl = (portal as any).icon_url || (portal as any).icon_file_name || (portal as any).icon;
-            
-            let finalImgSrc = "";
-
-            // Проверяваме дали има "http" някъде в стринга
-            if (possibleUrl && typeof possibleUrl === 'string' && possibleUrl.includes('http')) {
-                // Ако има http, изрязваме всичко преди него! 
-                // Това оправя проблема "/images/backgrounds/https://..."
-                finalImgSrc = possibleUrl.substring(possibleUrl.indexOf('http'));
-            } else {
-                // Ако няма http, значи е локален файл -> ползваме helper-а
-                finalImgSrc = getImageUrl(possibleUrl);
-            }
-            // --------------------------------
+            // Извикваме новата функция
+            const finalImgSrc = resolvePortalImage(portal);
 
             return (
             <div
@@ -117,6 +136,11 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
                   src={finalImgSrc}
                   alt={portal.name}
                   className="w-full h-48 object-cover"
+                  onError={(e) => {
+                    // Защита: Ако и този URL гръмне, слагаме placeholder
+                    e.currentTarget.src = "/images/placeholder-1.png";
+                    console.error("Image failed to load:", finalImgSrc);
+                  }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
                 <div className="absolute bottom-4 left-4 text-white">
