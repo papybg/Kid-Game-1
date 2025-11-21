@@ -13,8 +13,8 @@ interface PortalSelectionProps {
 export default function PortalSelection({ onBackToWelcome, onSelectPortal }: PortalSelectionProps) {
   const { theme, setTheme } = useTheme();
 
-  // Заявка към сървъра. 
-  // staleTime: 0 гарантира, че ако добавиш нов портал в админа, той ще се появи веднага тук.
+  // Заявка към API-то. 
+  // staleTime: 0 и refetchOnMount гарантират, че няма да ползваме стар кеш.
   const { data: portals = [], isLoading, error } = useQuery<Portal[]>({
     queryKey: ['api/portals'],
     staleTime: 0, 
@@ -25,23 +25,25 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
     setTheme(theme === "dark" ? "light" : "dark");
   };
 
-  // --- ФУНКЦИЯТА, КОЯТО ОПРАВЯ БЪГА С КАРТИНКИТЕ ---
-  // Тя е критично важна, защото базата ти връща счупени пътища (https:/)
+  // --- СПЕЦИАЛНА ФУНКЦИЯ ЗА ПОПРАВКА НА URL (V3) ---
   const getSafeUrl = (portal: any) => {
-      // 1. Взимаме данните от всички възможни полета
+      // 1. Взимаме суровите данни от всички възможни полета
       const raw = portal.icon_url || portal.icon_file_name || portal.icon;
       let str = String(raw || "").trim();
 
-      // 2. Ако няма данни, връщаме placeholder
+      // DEBUG: Това ще го видиш в конзолата (F12), ако пак има проблем
+      // console.log(`Processing icon for ${portal.name}:`, str);
+
+      // 2. Ако няма нищо
       if (!str || str === "null" || str === "undefined") return "/images/placeholder-1.png";
 
-      // 3. Ако е външен линк (Cloudinary)
+      // 3. АКО СЪДЪРЖА "http" (независимо дали е в началото или по средата)
       if (str.includes("http")) {
-          // Изрязваме всичко преди http (ако локалният път се е залепил)
+          // Изрязваме всичко преди "http" (ако локалният път се е залепил погрешка)
           let clean = str.substring(str.indexOf("http"));
           
-          // Оправяме счупените наклонени черти (от https:/ на https://)
-          // Този Regex хваща и http:/ и https:/ и ги прави валидни
+          // ВАЖНО: Оправяме счупените наклонени черти (от https:/ на https://)
+          // Този Regex оправя и http:/ и https:/, и ги прави с двойна черта
           clean = clean.replace(/https?:\/+/g, (match) => {
               return match.startsWith('https') ? 'https://' : 'http://';
           });
@@ -49,7 +51,8 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
           return clean;
       }
 
-      // 4. Ако е локален файл (започва с / или име на файл)
+      // 4. АКО Е ЛОКАЛЕН ФАЙЛ (няма http)
+      // Махаме водещата наклонена черта, за да не става //images
       const path = str.startsWith("/") ? str.substring(1) : str;
       return `/images/backgrounds/${path}`;
   };
@@ -70,7 +73,7 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
     return (
       <div className="fixed inset-0 z-40 flex items-center justify-center bg-background">
          <div className="text-center space-y-4">
-            <p className="text-destructive">Възникна грешка при връзката със сървъра.</p>
+            <p className="text-destructive">Грешка при връзката със сървъра.</p>
             <Button onClick={() => window.location.reload()}>Опитай пак</Button>
          </div>
       </div>
@@ -85,7 +88,7 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
           <ArrowLeft className="w-5 h-5" />
         </Button>
         
-        <h1 className="font-display font-bold text-2xl md:text-3xl text-center flex-1">
+        <h1 className="font-display font-bold text-2xl md:text-3xl text-center flex-1 text-primary">
           Избери световете
         </h1>
         
@@ -106,12 +109,13 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
             >
               <div className="relative">
                 <img
-                  // ТУК ИЗПОЛЗВАМЕ ПОПРАВКАТА
+                  // ТУК ИЗПОЛЗВАМЕ ФУНКЦИЯТА
                   src={getSafeUrl(portal)}
                   alt={portal.name}
                   className="w-full h-48 object-cover"
                   onError={(e) => {
-                     // Ако въпреки всичко картинката не зареди, показваме резервна
+                     // Ако и това не помогне, слагаме placeholder и логваме грешката
+                     console.error(`Failed to load image for ${portal.name}. Src was:`, e.currentTarget.src);
                      e.currentTarget.src = "/images/placeholder-1.png";
                   }}
                 />
@@ -121,7 +125,6 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
                   <p className="text-xs text-gray-200 mt-1">Кликни за начало</p>
                 </div>
                 
-                {/* Декоративна икона горе вдясно */}
                 <div className="absolute top-4 right-4 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center shadow-md">
                   <span className="text-white text-xs">🌿</span>
                 </div>
@@ -135,7 +138,6 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
                   </div>
                   <div className="flex items-center gap-1">
                     <PuzzleIcon className="w-4 h-4 text-primary" />
-                    {/* Тук показваме броя нива, ако има такива */}
                     <span className="text-sm text-muted-foreground">{portal.layouts?.length || 0} нива</span>
                   </div>
                 </div>
@@ -143,7 +145,7 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
             </div>
           ))}
           
-           {/* Coming Soon Cards (Статични карти за бъдещо съдържание) */}
+           {/* Coming Soon Cards (Placeholder) */}
            <div className="bg-card rounded-2xl overflow-hidden shadow-lg opacity-50 grayscale">
               <div className="relative">
                  <img src="/images/placeholder-1.png" className="w-full h-48 object-contain bg-gray-100" />
