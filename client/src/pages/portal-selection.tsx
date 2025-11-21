@@ -17,19 +17,46 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
   const { data: portals = [], isLoading, error } = useQuery<Portal[]>({
     queryKey: ['portals'],
     queryFn: async () => {
-  const response = await fetch(apiPath('/api/portals'));
+      const response = await fetch(apiPath('/api/portals'));
       if (!response.ok) {
         throw new Error('Failed to fetch portals');
       }
       return response.json();
     },
     retry: 2,
-    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+    staleTime: 0, // Слагаме 0, за да виждаш промените веднага
   });
 
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark");
   };
+
+  // --- НОВАТА ФУНКЦИЯ ЗА ОПРАВЯНЕ НА ЛИНКОВЕТЕ ---
+  const getSafeUrl = (portal: any) => {
+      // 1. Търсим във всички възможни полета (за всеки случай)
+      const raw = portal.iconFileName || portal.fileName || portal.icon_url || portal.icon;
+      let str = String(raw || "").trim();
+
+      // Ако няма нищо
+      if (!str || str === "null") return "/images/placeholder-1.png";
+
+      // 2. АКО Е ЛИНК (Cloudinary) -> Връщаме го директно!
+      if (str.includes("http")) {
+          let clean = str.substring(str.indexOf("http"));
+          
+          // Оправяме счупени наклонени черти (https:/ -> https://)
+          clean = clean.replace(/https?:\/+/g, (match) => {
+              return match.startsWith('https') ? 'https://' : 'http://';
+          });
+          
+          return clean;
+      }
+
+      // 3. АКО Е ЛОКАЛЕН ФАЙЛ -> Само тогава лепим папката
+      const path = str.startsWith("/") ? str.substring(1) : str;
+      return `/images/backgrounds/${path}`;
+  };
+  // ------------------------------------------------
 
   if (isLoading) {
     return (
@@ -111,13 +138,15 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
             >
               <div className="relative">
                 <img
-                  src={`/images/backgrounds/${portal.iconFileName || portal.fileName}`}
-                  alt={portal.portalName}
+                  // ТУК ПОЛЗВАМЕ НОВАТА ФУНКЦИЯ
+                  src={getSafeUrl(portal)}
+                  alt={portal.portalName || portal.name}
                   className="w-full h-48 object-cover"
+                  onError={(e) => { e.currentTarget.src = "/images/placeholder-1.png"; }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
                 <div className="absolute bottom-4 left-4 text-white">
-                  <h3 className="font-display font-semibold text-xl">{portal.portalName}</h3>
+                  <h3 className="font-display font-semibold text-xl">{portal.portalName || portal.name}</h3>
                   <p className="text-sm text-gray-200">Открий животните в природата</p>
                 </div>
                 <div className="absolute top-4 right-4 w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
@@ -132,7 +161,7 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
                   </div>
                   <div className="flex items-center gap-1">
                     <PuzzleIcon className="w-4 h-4 text-primary" />
-                    <span className="text-sm text-muted-foreground">{portal.layouts.length} нива</span>
+                    <span className="text-sm text-muted-foreground">{portal.layouts?.length || 0} нива</span>
                   </div>
                 </div>
               </div>
