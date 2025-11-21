@@ -1,168 +1,155 @@
-import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { useAudio } from "../hooks/use-audio";
-import { useSettingsStore } from "../lib/settings-store";
-import type { GameItem } from "@shared/schema";
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import * as Tone from 'tone';
 
-type AudioContextType = {
-  isInitialized: boolean;
-  soundEnabled: boolean;
-  musicEnabled: boolean;
-  effectsEnabled: boolean;
-  isAudioPlaying: boolean;
-  setSoundEnabled: (enabled: boolean) => void;
-  setMusicEnabled: (enabled: boolean) => void;
-  setEffectsEnabled: (enabled: boolean) => void;
-  playSound: (type: 'success' | 'error' | 'click' | 'start' | 'bell') => void;
-  playVoice: (type: 'bravo' | 'tryAgain') => HTMLAudioElement | null;
-  playItemSound: (item: GameItem, delay?: number) => HTMLAudioElement | null;
-  getSoundFile: (name: 'win' | 'bravo' | 'tryAgain') => HTMLAudioElement | null;
+interface AudioContextType {
+  playSuccess: () => Promise<void>;
+  playClick: () => Promise<void>;
+  playItemSound: (itemName: string, audioUrl?: string, delay?: number) => Promise<void>;
+  toggleMute: () => void;
+  isMuted: boolean;
   initializeAudio: () => Promise<void>;
-};
+}
 
-const AudioContext = createContext<AudioContextType | undefined>(undefined);
-
-const VOICE_FILES: { [key: string]: string } = {
-  bravo: '/audio/voices/bravo.wav',
-  tryAgain: '/audio/voices/try-again.wav',
-  win: '/audio/voices/win.wav',
-};
+const AudioContext = createContext<AudioContextType | null>(null);
 
 export function AudioProvider({ children }: { children: React.ReactNode }) {
+  const [isMuted, setIsMuted] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   
-  const { soundEnabled, setSoundEnabled: storeSetSoundEnabled } = useSettingsStore();
-  const { initializeAudio: initAudio, playTone } = useAudio();
-  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  // Tone.js Synth само за системните звуци (цъкане и успех)
+  const synth = useRef<Tone.PolySynth | null>(null);
 
-  const stopCurrentAudio = () => {
-    if (currentAudioRef.current) {
-      currentAudioRef.current.pause();
-      currentAudioRef.current.currentTime = 0;
-      currentAudioRef.current = null;
-    }
-    setIsAudioPlaying(false);
-  };
-
+  // 1. Инициализация при първи клик (Задължително за Edge/Chrome)
   const initializeAudio = async () => {
+    if (isInitialized) return;
+
     try {
-      await initAudio();
+      await Tone.start();
+      
+      if (Tone.context.state !== 'running') {
+        await Tone.context.resume();
+      }
+
+      synth.current = new Tone.PolySynth(Tone.Synth).toDestination();
+      synth.current.volume.value = -10;
+      
       setIsInitialized(true);
-      console.log('Audio system initialized');
+      console.log('Audio System Unlocked');
     } catch (error) {
-      console.error('Failed to initialize audio:', error);
+      console.error('Failed to initialize audio context:', error);
     }
   };
 
-  const getSoundFile = (name: 'win' | 'bravo' | 'tryAgain'): HTMLAudioElement | null => {
-    if (!isInitialized || !soundEnabled) return null;
-    const url = VOICE_FILES[name];
-    if (!url) return null;
+  // 2. Пускане на кратки системни звуци (Tone.js)
+  const playSuccess = async () => {
+    if (isMuted || !synth.current) return;
+    try {
+        await Tone.start(); // Подсигуряване
+        const now = Tone.now();
+        synth.current.triggerAttackRelease("C5", "8n", now);
+        synth.current.triggerAttackRelease("E5", "8n", now + 0.1);
+        synth.current.triggerAttackRelease("G5", "8n", now + 0.2);
+    } catch (e) { console.log("Synth error", e); }
+  };
+
+  const playClick = async () => {
+    if (isMuted || !synth.current) return;
+    try {
+        await Tone.start(); 
+        synth.current.triggerAttackRelease("G4", "16n");
+    } catch (e) { console.log("Click error", e); }
+  };
+
+  // 3. ГЛАВНАТА ПРОМЯНА: Използваме стандартно HTML5 Audio за файловете
+  // Това работи много по-стабилно в Edge за MP3 файлове
+  const playItemSound = (itemName: string, audioUrl?: string, delay: number = 0): Promise<void> => {
+    return new Promise((resolve) => {
+        // Ако е mute или няма линк -> веднага продължаваме играта
+        if (isMuted || !audioUrl) {
+            resolve();
+            return;
+        }
+
+        // Изчакваме (ако има delay, напр. да се скрие старата карта)
+        setTimeout(() => {
+            // Създаваме стандартен плеър
+            const player = new Audio(audioUrl);
+            
+            // Настройваме събитията ПРЕДИ да пуснем звука
+            
+            // Успешен край -> казваме на играта да продължи
+            player.onended = () => {
+                resolve();
+            };
+
+            // Грешка (напр. файлът липсва) -> казваме на играта да продължи, за да не забие
+            player.onerror = (e) => {
+                console.warn(`Audio error for ${itemName}:`, e);
+                resolve(); 
+            };
+
+            // Опит за пускане
+            const playPromise = player.play();
+
+            // Edge изисква да хванем грешката, ако autoplay е забранен
+            if (playPromise !== undefined) {
+                playPromise.catch((error) => {
+                    console.warn("Browser blocked audio autoplay:", error);
+                    // Дори да е блокирано, ние "решаваме" промиса, за да не спре играта
+                    resolve();
+                });
+            }
+        }, delay);
+    });
+  };
+
+  const toggleMute = () => {
+    setIsMuted(prev => !prev);
+  };
+
+  // Автоматичен опит за старт при зареждане
+  useEffect(() => {
+    const init = async () => {
+        try {
+            synth.current = new Tone.PolySynth(Tone.Synth).toDestination();
+        } catch (e) {}
+    };
+    init();
     
-    const audio = new Audio(url);
-    audio.addEventListener('play', () => {
-      stopCurrentAudio();
-      setIsAudioPlaying(true);
-      currentAudioRef.current = audio;
-    });
-    audio.addEventListener('ended', () => {
-      setIsAudioPlaying(false);
-      currentAudioRef.current = null;
-    });
-    audio.addEventListener('error', () => setIsAudioPlaying(false));
-    return audio;
-  };
-  
-  const playSound = (type: 'success' | 'error' | 'click' | 'start' | 'bell') => {
-    if (!isInitialized || !soundEnabled) return;
-    const frequencies = {
-      success: [440, 554, 659], error: [220, 233, 246], click: [800],
-      start: [261, 329, 392], bell: [800, 1000, 1200],
+    // Добавяме глобален слушател за първи клик, за да "отпушим" звука в Edge
+    const unlockHandler = () => {
+        initializeAudio();
+        window.removeEventListener('click', unlockHandler);
+        window.removeEventListener('touchstart', unlockHandler);
     };
-    const freqs = frequencies[type];
-    if (freqs) freqs.forEach((freq, index) => setTimeout(() => playTone(freq, 0.2), index * 100));
-  };
-  
-  const playVoice = (type: 'bravo' | 'tryAgain'): HTMLAudioElement | null => {
-    const voiceSound = getSoundFile(type);
-    voiceSound?.play().catch(e => console.error(`Failed to play voice ${type}:`, e));
-    return voiceSound;
-  };
-
-  const playItemSound = (item: GameItem, delay?: number): HTMLAudioElement | null => {
-    if (!isInitialized || !soundEnabled || !item.audio) return null;
-    console.log('playItemSound called with:', item.name, 'audio:', item.audio, 'delay:', delay);
-
-    let audio: HTMLAudioElement | null = null;
-    const play = () => {
-      console.log('Creating new Audio object for:', item.audio);
-      const sound = new Audio(item.audio!); // Разчитаме на данните от базата
-      sound.volume = 0.7;
-      
-      sound.addEventListener('play', () => { 
-        console.log('Audio play event for:', item.name);
-        stopCurrentAudio(); 
-        setIsAudioPlaying(true); 
-        currentAudioRef.current = sound; 
-      });
-      sound.addEventListener('ended', () => { 
-        console.log('Audio ended event for:', item.name);
-        setIsAudioPlaying(false); 
-        currentAudioRef.current = null; 
-      });
-      sound.addEventListener('error', (e) => { 
-        console.log('Audio error for:', item.name, e);
-        setIsAudioPlaying(false); 
-        currentAudioRef.current = null; 
-      });
-      
-      sound.play().then(() => {
-        console.log('Audio play() promise resolved for:', item.name);
-      }).catch((e) => {
-        console.log('Audio play() failed for:', item.name, e);
-        playTone(300, 0.3);
-      });
-      audio = sound;
+    
+    window.addEventListener('click', unlockHandler);
+    window.addEventListener('touchstart', unlockHandler);
+    
+    return () => {
+        window.removeEventListener('click', unlockHandler);
+        window.removeEventListener('touchstart', unlockHandler);
     };
-
-    if (delay && delay > 0) {
-      setTimeout(play, delay);
-    } else {
-      play();
-    }
-    return audio;
-  };
-
+  }, []);
 
   return (
-    <AudioContext.Provider
-      value={{
-        isInitialized,
-        soundEnabled,
-        isAudioPlaying,
-        setSoundEnabled: storeSetSoundEnabled,
-        // Тези вече не са нужни, но ги оставяме, за да не счупим други компоненти
-        musicEnabled: false,
-        effectsEnabled: true,
-        setMusicEnabled: () => {},
-        setEffectsEnabled: () => {},
-        //------------------
-        playSound,
-        playVoice,
-        playItemSound,
-        getSoundFile,
-        initializeAudio,
-      }}
-    >
+    <AudioContext.Provider value={{ 
+      playSuccess, 
+      playClick, 
+      playItemSound, 
+      toggleMute, 
+      isMuted,
+      initializeAudio 
+    }}>
       {children}
     </AudioContext.Provider>
   );
 }
 
-export const useAudioContext = () => {
+export function useAudio() {
   const context = useContext(AudioContext);
-  if (context === undefined) {
-    throw new Error('useAudioContext must be used within an AudioProvider');
+  if (!context) {
+    throw new Error('useAudio must be used within an AudioProvider');
   }
   return context;
-}; 
+}
