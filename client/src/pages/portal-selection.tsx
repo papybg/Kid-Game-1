@@ -24,7 +24,7 @@ export default function PortalSelection({ onBackToWelcome, onSelectPortal }: Por
       return response.json();
     },
     retry: 2,
-    staleTime: 0, // Слагаме 0, за да виждаш промените веднага
+    staleTime: 0, // Слагаме 0, за да виждаш промените веднага, тралала
   });
 
   const toggleTheme = () => {
