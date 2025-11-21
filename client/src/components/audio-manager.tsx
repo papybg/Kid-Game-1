@@ -1,63 +1,65 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import * as Tone from 'tone';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 interface AudioContextType {
-  playSuccess: () => Promise<void>;
-  playClick: () => Promise<void>;
+  playSuccess: () => void;
+  playClick: () => void;
   playItemSound: (itemName: string, audioUrl?: string, delay?: number) => Promise<void>;
   toggleMute: () => void;
   isMuted: boolean;
-  initializeAudio: () => Promise<void>;
+  initializeAudio: () => void;
 }
 
 const AudioContext = createContext<AudioContextType | null>(null);
 
 export function AudioProvider({ children }: { children: React.ReactNode }) {
   const [isMuted, setIsMuted] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
-  
-  const synth = useRef<Tone.PolySynth | null>(null);
 
-  const initializeAudio = async () => {
-    if (isInitialized) return;
-
+  // Прости звукови ефекти (Beep) с Web Audio API (без библиотеки)
+  const playBeep = (freq: number = 440, type: 'sine' | 'square' = 'sine', duration: number = 0.1) => {
+    if (isMuted) return;
     try {
-      await Tone.start();
-      
-      if (Tone.context.state !== 'running') {
-        await Tone.context.resume();
-      }
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AudioContext) return;
+        
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
 
-      synth.current = new Tone.PolySynth(Tone.Synth).toDestination();
-      synth.current.volume.value = -10;
-      
-      setIsInitialized(true);
-      console.log('Audio System Unlocked');
-    } catch (error) {
-      console.error('Failed to initialize audio context:', error);
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        
+        gain.gain.setValueAtTime(0.1, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + duration);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start();
+        osc.stop(ctx.currentTime + duration);
+    } catch (e) {
+        console.error("Beep error", e);
     }
   };
 
-  const playSuccess = async () => {
-    if (isMuted || !synth.current) return;
-    try {
-        await Tone.start();
-        const now = Tone.now();
-        synth.current.triggerAttackRelease("C5", "8n", now);
-        synth.current.triggerAttackRelease("E5", "8n", now + 0.1);
-        synth.current.triggerAttackRelease("G5", "8n", now + 0.2);
-    } catch (e) { console.log("Synth error", e); }
+  const initializeAudio = () => {
+    // При простата система няма нужда от тежка инициализация
+    console.log("Audio Simple Mode Ready");
   };
 
-  const playClick = async () => {
-    if (isMuted || !synth.current) return;
-    try {
-        await Tone.start(); 
-        synth.current.triggerAttackRelease("G4", "16n");
-    } catch (e) { console.log("Click error", e); }
+  const playSuccess = () => {
+    if (isMuted) return;
+    // Три-тонална мелодия за успех
+    setTimeout(() => playBeep(523.25, 'sine', 0.1), 0);   // C5
+    setTimeout(() => playBeep(659.25, 'sine', 0.1), 100); // E5
+    setTimeout(() => playBeep(783.99, 'sine', 0.2), 200); // G5
   };
 
-  // HTML5 Audio Player (Стабилен за всички браузъри)
+  const playClick = () => {
+    if (isMuted) return;
+    playBeep(800, 'triangle', 0.05); // Кратко "цък"
+  };
+
+  // Основната функция за гласовете (MP3)
   const playItemSound = (itemName: string, audioUrl?: string, delay: number = 0): Promise<void> => {
     return new Promise((resolve) => {
         if (isMuted || !audioUrl) {
@@ -68,19 +70,18 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         setTimeout(() => {
             const player = new Audio(audioUrl);
             
-            player.onended = () => { resolve(); };
-
+            player.onended = () => resolve();
+            
             player.onerror = (e) => {
-                console.warn(`Audio error for ${itemName}:`, e);
-                resolve(); 
+                console.warn(`Audio fail for ${itemName}`, e);
+                resolve(); // Продължаваме играта дори при грешка
             };
 
             const playPromise = player.play();
-
             if (playPromise !== undefined) {
                 playPromise.catch((error) => {
-                    console.warn("Browser blocked audio autoplay:", error);
-                    resolve();
+                    console.log("Audio autoplay blocked by browser:", error);
+                    resolve(); // Продължаваме
                 });
             }
         }, delay);
@@ -90,29 +91,6 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const toggleMute = () => {
     setIsMuted(prev => !prev);
   };
-
-  useEffect(() => {
-    const init = async () => {
-        try {
-            synth.current = new Tone.PolySynth(Tone.Synth).toDestination();
-        } catch (e) {}
-    };
-    init();
-    
-    const unlockHandler = () => {
-        initializeAudio();
-        window.removeEventListener('click', unlockHandler);
-        window.removeEventListener('touchstart', unlockHandler);
-    };
-    
-    window.addEventListener('click', unlockHandler);
-    window.addEventListener('touchstart', unlockHandler);
-    
-    return () => {
-        window.removeEventListener('click', unlockHandler);
-        window.removeEventListener('touchstart', unlockHandler);
-    };
-  }, []);
 
   return (
     <AudioContext.Provider value={{ 
@@ -128,7 +106,6 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ТУК БЕШЕ ГРЕШКАТА - Върнах старото име, за да не гърми App.tsx
 export function useAudioContext() {
   const context = useContext(AudioContext);
   if (!context) {
