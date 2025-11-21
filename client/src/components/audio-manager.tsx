@@ -16,10 +16,8 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const [isMuted, setIsMuted] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   
-  // Tone.js Synth само за системните звуци (цъкане и успех)
   const synth = useRef<Tone.PolySynth | null>(null);
 
-  // 1. Инициализация при първи клик (Задължително за Edge/Chrome)
   const initializeAudio = async () => {
     if (isInitialized) return;
 
@@ -40,11 +38,10 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // 2. Пускане на кратки системни звуци (Tone.js)
   const playSuccess = async () => {
     if (isMuted || !synth.current) return;
     try {
-        await Tone.start(); // Подсигуряване
+        await Tone.start();
         const now = Tone.now();
         synth.current.triggerAttackRelease("C5", "8n", now);
         synth.current.triggerAttackRelease("E5", "8n", now + 0.1);
@@ -60,42 +57,29 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     } catch (e) { console.log("Click error", e); }
   };
 
-  // 3. ГЛАВНАТА ПРОМЯНА: Използваме стандартно HTML5 Audio за файловете
-  // Това работи много по-стабилно в Edge за MP3 файлове
+  // HTML5 Audio Player (Стабилен за всички браузъри)
   const playItemSound = (itemName: string, audioUrl?: string, delay: number = 0): Promise<void> => {
     return new Promise((resolve) => {
-        // Ако е mute или няма линк -> веднага продължаваме играта
         if (isMuted || !audioUrl) {
             resolve();
             return;
         }
 
-        // Изчакваме (ако има delay, напр. да се скрие старата карта)
         setTimeout(() => {
-            // Създаваме стандартен плеър
             const player = new Audio(audioUrl);
             
-            // Настройваме събитията ПРЕДИ да пуснем звука
-            
-            // Успешен край -> казваме на играта да продължи
-            player.onended = () => {
-                resolve();
-            };
+            player.onended = () => { resolve(); };
 
-            // Грешка (напр. файлът липсва) -> казваме на играта да продължи, за да не забие
             player.onerror = (e) => {
                 console.warn(`Audio error for ${itemName}:`, e);
                 resolve(); 
             };
 
-            // Опит за пускане
             const playPromise = player.play();
 
-            // Edge изисква да хванем грешката, ако autoplay е забранен
             if (playPromise !== undefined) {
                 playPromise.catch((error) => {
                     console.warn("Browser blocked audio autoplay:", error);
-                    // Дори да е блокирано, ние "решаваме" промиса, за да не спре играта
                     resolve();
                 });
             }
@@ -107,7 +91,6 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     setIsMuted(prev => !prev);
   };
 
-  // Автоматичен опит за старт при зареждане
   useEffect(() => {
     const init = async () => {
         try {
@@ -116,7 +99,6 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     };
     init();
     
-    // Добавяме глобален слушател за първи клик, за да "отпушим" звука в Edge
     const unlockHandler = () => {
         initializeAudio();
         window.removeEventListener('click', unlockHandler);
@@ -146,10 +128,11 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function useAudio() {
+// ТУК БЕШЕ ГРЕШКАТА - Върнах старото име, за да не гърми App.tsx
+export function useAudioContext() {
   const context = useContext(AudioContext);
   if (!context) {
-    throw new Error('useAudio must be used within an AudioProvider');
+    throw new Error('useAudioContext must be used within an AudioProvider');
   }
   return context;
 }
