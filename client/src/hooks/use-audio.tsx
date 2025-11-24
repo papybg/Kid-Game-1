@@ -1,23 +1,18 @@
 import { useCallback, useRef, useState } from 'react';
-
-declare global {
-  interface Window {
-    Tone?: any;
-  }
-}
+import * as Tone from 'tone';
 
 export function useAudio() {
   const [isInitialized, setIsInitialized] = useState(false);
   const synthRef = useRef<any>(null);
 
   const initializeAudio = useCallback(async () => {
-    if (isInitialized || !window.Tone) return;
+    if (isInitialized) return;
 
     try {
-      await window.Tone.start();
-      synthRef.current = new window.Tone.Synth().toDestination();
+      await Tone.start();
+      synthRef.current = new Tone.Synth().toDestination();
       setIsInitialized(true);
-      console.log('Audio initialized successfully');
+      console.log('Audio initialized successfully (npm tone)');
     } catch (error) {
       console.error('Failed to initialize audio:', error);
       throw error;
