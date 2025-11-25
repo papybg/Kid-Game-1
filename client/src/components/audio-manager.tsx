@@ -1,4 +1,3 @@
-// Брой редове: 147
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useAudio } from "../hooks/use-audio";
 import { useSettingsStore } from "../lib/settings-store";
@@ -61,7 +60,6 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     if (!url) return null;
     
     const audio = new Audio();
-    // 1. ВАЖНО: Разрешаваме CDN заявки без cookies
     audio.crossOrigin = "anonymous";
     audio.src = url;
 
@@ -74,7 +72,6 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       setIsAudioPlaying(false);
       currentAudioRef.current = null;
     });
-    audio.addEventListener('error', () => setIsAudioPlaying(false));
     return audio;
   };
   
@@ -92,9 +89,9 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const playVoice = (type: 'bravo' | 'tryAgain'): HTMLAudioElement | null => {
     const voiceSound = getSoundFile(type);
     if (voiceSound) {
-        const playPromise = voiceSound.play();
-        if (playPromise !== undefined) {
-            playPromise.catch(e => console.error(`Failed to play voice ${type}:`, e));
+        const p = voiceSound.play();
+        if (p !== undefined) {
+            p.catch(e => console.log("Voice play blocked", e));
         }
     }
     return voiceSound;
@@ -102,43 +99,48 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
 
   const playItemSound = (item: GameItem, delay?: number): HTMLAudioElement | null => {
     if (!isInitialized || !soundEnabled || !item.audio) return null;
-    console.log('playItemSound called with:', item.name, 'audio:', item.audio);
+    
+    // 1. ТРИКЪТ: Добавяме timestamp, за да излъжем кеша/tracking prevention на Edge
+    const uniqueUrl = `${item.audio}?t=${Date.now()}`;
+    console.log('Attempting to play:', item.name, uniqueUrl);
 
     let audio: HTMLAudioElement | null = null;
     
     const play = () => {
-      // --- FIX: Correct handling of Cloudinary/CDN in Edge ---
       const sound = new Audio();
-      sound.crossOrigin = "anonymous"; // Това казва на браузъра да не блокира файла заради Privacy
-      sound.src = item.audio!;
-      sound.volume = 0.7;
       
-      sound.addEventListener('play', () => { 
-        console.log('Audio play started for:', item.name);
+      // 2. ВАЖНО: crossOrigin трябва да е преди src
+      sound.crossOrigin = "anonymous";
+      sound.src = uniqueUrl;
+      sound.volume = 1.0; // Усилваме звука
+      
+      sound.onplay = () => { 
+        console.log('Audio STARTED:', item.name);
         stopCurrentAudio(); 
         setIsAudioPlaying(true); 
         currentAudioRef.current = sound; 
-      });
-      sound.addEventListener('ended', () => { 
-        setIsAudioPlaying(false); 
-        currentAudioRef.current = null; 
-      });
-      sound.addEventListener('error', (e) => { 
-        console.error('Audio error (check CORS/Format):', item.name, e);
-        setIsAudioPlaying(false); 
-        currentAudioRef.current = null; 
-      });
+      };
       
-      // Защита срещу блокиране на play()
+      sound.onended = () => { 
+        console.log('Audio ENDED:', item.name);
+        setIsAudioPlaying(false); 
+        currentAudioRef.current = null; 
+      };
+      
+      sound.onerror = (e) => {
+          console.error("Audio LOAD Error:", item.name, e);
+          // Fallback: Ако mp3-то не тръгне, поне да чуем "бип"
+          playTone(200, 0.1);
+      };
+      
+      // 3. Безопасно пускане
       const playPromise = sound.play();
 
       if (playPromise !== undefined) {
           playPromise.then(() => {
-            console.log('Audio playing successfully:', item.name);
+            // Успех
           }).catch((e) => {
-            console.warn('Playback prevented:', e);
-            // Fallback: Ако mp3-то не тръгне, пускаме "бип" от синтезатора
-            playTone(440, 0.1); 
+            console.warn('Playback prevented by browser:', e);
           });
       }
 
@@ -152,7 +154,6 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     }
     return audio;
   };
-
 
   return (
     <AudioContext.Provider
