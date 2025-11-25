@@ -1,25 +1,31 @@
-// vite.config.ts
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+// Брой редове: 39
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 import path from "path";
-import themePlugin from "@replit/vite-plugin-shadcn-theme-json";
-import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
+
+// ПРЕМАХНАХМЕ импортите на @replit, защото чупят Vercel
 
 export default defineConfig({
-  plugins: [react(), runtimeErrorOverlay(), themePlugin()],
+  // Изчистен списък с плъгини (само React)
+  plugins: [react()],
+  
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "client", "src"),
       "@shared": path.resolve(__dirname, "shared"),
     },
   },
+  
   root: path.resolve(__dirname, "client"),
+  
   build: {
     outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: true,
   },
-  // --- ДОБАВИ ТАЗИ СЕКЦИЯ server ---
+  
+  // Запазваме проксито за локална разработка (за да се чува Бобо)
   server: {
+    host: "0.0.0.0",
     proxy: {
       '/game-audio': {
         target: 'https://res.cloudinary.com/db8o7so6j/video/upload',
@@ -35,5 +41,4 @@ export default defineConfig({
       }
     }
   }
-  // --------------------------------
 });
