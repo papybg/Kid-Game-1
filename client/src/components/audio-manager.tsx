@@ -54,20 +54,12 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // ТАЗИ ФУНКЦИЯ ПРЕВРЪЩА Cloudinary В ЛОКАЛЕН ЛИНК
+  // Helper: Конструира прокси URL, но само ако сме в среда, която го поддържа
   const getProxyUrl = (url: string) => {
-      if (!url) return '';
-      // Ако вече е локален, не го пипаме
-      if (url.startsWith('/')) return url;
-      
-      // Ако е от Cloudinary, го пренасочваме през нашето прокси
-      if (url.includes('cloudinary.com')) {
-          // Търсим частта след /upload/
-          const parts = url.split('/upload/');
-          if (parts.length === 2) {
-             // Връщаме /game-audio/v1234.../cat.mp3
-             return `/game-audio/${parts[1]}`;
-          }
+      if (!url || !url.includes('cloudinary.com')) return url;
+      const parts = url.split('/upload/');
+      if (parts.length === 2) {
+         return `/game-audio/${parts[1]}`;
       }
       return url;
   };
@@ -77,9 +69,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     const url = VOICE_FILES[name];
     if (!url) return null;
     
-    // Стандартно аудио - без Fetch, без магии
     const audio = new Audio(url);
-    
     audio.onplay = () => {
       stopCurrentAudio();
       setIsAudioPlaying(true);
@@ -113,38 +103,50 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
 
   const playItemSound = (item: GameItem, delay?: number): HTMLAudioElement | null => {
     if (!isInitialized || !soundEnabled || !item.audio) return null;
-    
-    // 1. Взимаме "безопасния" линк
-    const safeUrl = getProxyUrl(item.audio);
-    console.log(`Playing proxy audio: ${safeUrl} (Original: ${item.audio})`);
+
+    // СТРАТЕГИЯТА "УМЕН FALLBACK"
+    const proxyUrl = getProxyUrl(item.audio);
+    const originalUrl = item.audio;
+
+    console.log(`Trying Proxy: ${proxyUrl}`);
 
     let audio: HTMLAudioElement | null = null;
     
     const play = () => {
-      const sound = new Audio(safeUrl);
+      // 1. Пробваме с Прокси URL-а
+      const sound = new Audio(proxyUrl);
       sound.volume = 1.0;
       
       sound.onplay = () => { 
-        console.log('Audio STARTED:', item.name);
+        console.log('Audio STARTED (Proxy):', item.name);
         stopCurrentAudio(); 
         setIsAudioPlaying(true); 
         currentAudioRef.current = sound; 
       };
       
       sound.onended = () => { 
-        console.log('Audio ENDED:', item.name);
         setIsAudioPlaying(false); 
         currentAudioRef.current = null; 
       };
       
+      // 2. АКО ПРОКСИТО ГРЪМНЕ (404 грешката, която виждаш в лога)
       sound.onerror = (e) => {
-        console.error('Audio ERROR:', item.name, e);
-        playTone(200, 0.2); // Fallback
+        console.warn('Proxy failed (404 likely). Switching to Direct URL...', item.name);
+        
+        // Веднага сменяме източника на оригиналния
+        sound.src = originalUrl!;
+        
+        // Опитваме пак
+        sound.play().then(() => {
+            console.log('Audio recovered with Direct URL');
+        }).catch(err => {
+            console.error('Direct play also failed:', err);
+            playTone(200, 0.2); // Последен шанс - бип
+        });
       };
       
-      // Просто .play() - без fetch, без blob, без headers
       sound.play().catch((e) => {
-        console.warn('Autoplay prevented:', e);
+        console.warn('Autoplay prevented on proxy attempt:', e);
       });
 
       audio = sound;
