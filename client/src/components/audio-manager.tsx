@@ -79,13 +79,20 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       success: [440, 554, 659], error: [220, 233, 246], click: [800],
       start: [261, 329, 392], bell: [800, 1000, 1200],
     };
+    // @ts-ignore
     const freqs = frequencies[type];
-    if (freqs) freqs.forEach((freq, index) => setTimeout(() => playTone(freq, 0.2), index * 100));
+    if (freqs) freqs.forEach((freq: number, index: number) => setTimeout(() => playTone(freq, 0.2), index * 100));
   };
   
   const playVoice = (type: 'bravo' | 'tryAgain'): HTMLAudioElement | null => {
     const voiceSound = getSoundFile(type);
-    voiceSound?.play().catch(e => console.error(`Failed to play voice ${type}:`, e));
+    if (voiceSound) {
+        // FIX: Добавена проверка за undefined promise и тук
+        const playPromise = voiceSound.play();
+        if (playPromise !== undefined) {
+            playPromise.catch(e => console.error(`Failed to play voice ${type}:`, e));
+        }
+    }
     return voiceSound;
   };
 
@@ -116,12 +123,21 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         currentAudioRef.current = null; 
       });
       
-      sound.play().then(() => {
-        console.log('Audio play() promise resolved for:', item.name);
-      }).catch((e) => {
-        console.log('Audio play() failed for:', item.name, e);
-        playTone(300, 0.3);
-      });
+      // --- FIX START: Защита срещу Edge/Extensions ---
+      const playPromise = sound.play();
+
+      if (playPromise !== undefined) {
+          playPromise.then(() => {
+            console.log('Audio play() promise resolved for:', item.name);
+          }).catch((e) => {
+            console.log('Audio play() failed for:', item.name, e);
+            playTone(300, 0.3); // Fallback tone
+          });
+      } else {
+          console.warn('Audio play() returned undefined. Blocked by browser/extension.');
+      }
+      // --- FIX END ---
+
       audio = sound;
     };
 
@@ -141,12 +157,10 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         soundEnabled,
         isAudioPlaying,
         setSoundEnabled: storeSetSoundEnabled,
-        // Тези вече не са нужни, но ги оставяме, за да не счупим други компоненти
         musicEnabled: false,
         effectsEnabled: true,
         setMusicEnabled: () => {},
         setEffectsEnabled: () => {},
-        //------------------
         playSound,
         playVoice,
         playItemSound,
@@ -165,4 +179,4 @@ export const useAudioContext = () => {
     throw new Error('useAudioContext must be used within an AudioProvider');
   }
   return context;
-}; 
+};
