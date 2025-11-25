@@ -54,14 +54,28 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // --- НОВА ФУНКЦИЯ: Превръща Cloudinary линка в локален Vercel линк ---
+  const proxifyUrl = (url: string) => {
+    // Ако не е Cloudinary линк или е вече локален, връщаме го както е
+    if (!url || !url.includes('cloudinary.com')) return url;
+
+    // Cloudinary структурата ти е: .../upload/v123456/game-assets/cat.mp3
+    // Ние искаме всичко СЛЕД /upload/
+    const parts = url.split('/upload/');
+    if (parts.length < 2) return url;
+
+    // Връщаме новия "локален" път, дефиниран във vercel.json
+    // Резултатът ще е: /game-audio/v123456/game-assets/cat.mp3
+    return `/game-audio/${parts[1]}`;
+  };
+
   const getSoundFile = (name: 'win' | 'bravo' | 'tryAgain'): HTMLAudioElement | null => {
     if (!isInitialized || !soundEnabled) return null;
     const url = VOICE_FILES[name];
     if (!url) return null;
     
     const audio = new Audio();
-    // Тук също махаме crossOrigin и ползваме локални файлове
-    audio.src = url;
+    audio.src = url; // Локалните файлове нямат нужда от прокси
 
     audio.addEventListener('play', () => {
       stopCurrentAudio();
@@ -100,49 +114,38 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const playItemSound = (item: GameItem, delay?: number): HTMLAudioElement | null => {
     if (!isInitialized || !soundEnabled || !item.audio) return null;
     
-    // Добавяме timestamp, за да избегнем кеша
-    const uniqueUrl = `${item.audio}?t=${Date.now()}`;
-    console.log('Attempting to play (No-CORS):', item.name, uniqueUrl);
+    // Тук използваме прокси URL-а
+    const secureUrl = proxifyUrl(item.audio);
+    console.log(`Playing: ${item.name} | Proxy URL: ${secureUrl}`);
 
     let audio: HTMLAudioElement | null = null;
     
     const play = () => {
       const sound = new Audio();
-      
-      // ВАЖНО: Премахнахме crossOrigin = "anonymous". 
-      // Това прави заявката "Opaque" и Edge не би трябвало да я блокира за бисквитки.
-      
-      // Добавяме това за допълнителна защита от тракери
-      // @ts-ignore - Typescript може да се оплаче за referrerPolicy, но браузърът го разбира
-      sound.referrerPolicy = "no-referrer";
-      
-      sound.src = uniqueUrl;
+      sound.src = secureUrl;
       sound.volume = 1.0; 
       
       sound.onplay = () => { 
-        console.log('Audio STARTED:', item.name);
         stopCurrentAudio(); 
         setIsAudioPlaying(true); 
         currentAudioRef.current = sound; 
       };
       
       sound.onended = () => { 
-        console.log('Audio ENDED:', item.name);
         setIsAudioPlaying(false); 
         currentAudioRef.current = null; 
       };
       
       sound.onerror = (e) => {
           console.error("Audio LOAD Error:", item.name, e);
-          // Ако пак не стане, пробваме синтетичен звук
-          playTone(200, 0.1);
+          playTone(200, 0.1); // Fallback tone
       };
       
       const playPromise = sound.play();
 
       if (playPromise !== undefined) {
           playPromise.then(() => {
-            // Успех
+            // Success
           }).catch((e) => {
             console.warn('Playback prevented:', e);
           });
