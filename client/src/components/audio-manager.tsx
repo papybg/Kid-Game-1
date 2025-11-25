@@ -35,16 +35,6 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const { initializeAudio: initAudio, playTone } = useAudio();
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Пазим URL-ите на блобовете, за да ги чистим и да не пълним паметта
-  const activeBlobUrls = useRef<string[]>([]);
-
-  useEffect(() => {
-    // Cleanup при демонтиране на компонента
-    return () => {
-      activeBlobUrls.current.forEach(url => URL.revokeObjectURL(url));
-    };
-  }, []);
-
   const stopCurrentAudio = () => {
     if (currentAudioRef.current) {
       currentAudioRef.current.pause();
@@ -64,22 +54,41 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // ТАЗИ ФУНКЦИЯ ПРЕВРЪЩА Cloudinary В ЛОКАЛЕН ЛИНК
+  const getProxyUrl = (url: string) => {
+      if (!url) return '';
+      // Ако вече е локален, не го пипаме
+      if (url.startsWith('/')) return url;
+      
+      // Ако е от Cloudinary, го пренасочваме през нашето прокси
+      if (url.includes('cloudinary.com')) {
+          // Търсим частта след /upload/
+          const parts = url.split('/upload/');
+          if (parts.length === 2) {
+             // Връщаме /game-audio/v1234.../cat.mp3
+             return `/game-audio/${parts[1]}`;
+          }
+      }
+      return url;
+  };
+
   const getSoundFile = (name: 'win' | 'bravo' | 'tryAgain'): HTMLAudioElement | null => {
     if (!isInitialized || !soundEnabled) return null;
     const url = VOICE_FILES[name];
     if (!url) return null;
     
+    // Стандартно аудио - без Fetch, без магии
     const audio = new Audio(url);
     
-    audio.addEventListener('play', () => {
+    audio.onplay = () => {
       stopCurrentAudio();
       setIsAudioPlaying(true);
       currentAudioRef.current = audio;
-    });
-    audio.addEventListener('ended', () => {
+    };
+    audio.onended = () => {
       setIsAudioPlaying(false);
       currentAudioRef.current = null;
-    });
+    };
     return audio;
   };
   
@@ -97,72 +106,48 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const playVoice = (type: 'bravo' | 'tryAgain'): HTMLAudioElement | null => {
     const voiceSound = getSoundFile(type);
     if (voiceSound) {
-        const p = voiceSound.play();
-        if (p !== undefined) {
-            p.catch(e => console.log("Voice play blocked", e));
-        }
+        voiceSound.play().catch(e => console.error("Voice error", e));
     }
     return voiceSound;
   };
 
-  // --- ЯДРЕНАТА ОПЦИЯ: FETCH + BLOB ---
   const playItemSound = (item: GameItem, delay?: number): HTMLAudioElement | null => {
     if (!isInitialized || !soundEnabled || !item.audio) return null;
     
-    console.log('Fetching audio via Blob strategy for:', item.name);
+    // 1. Взимаме "безопасния" линк
+    const safeUrl = getProxyUrl(item.audio);
+    console.log(`Playing proxy audio: ${safeUrl} (Original: ${item.audio})`);
 
-    let audioObj: HTMLAudioElement | null = null;
+    let audio: HTMLAudioElement | null = null;
     
-    const play = async () => {
-      try {
-        // 1. Ръчно изтегляне на файла. Това заобикаля Tracking Prevention,
-        // защото е просто "data fetch", а не "third-party media play".
-        const response = await fetch(item.audio!);
-        
-        if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
-        
-        // 2. Превръщане в Blob (сурови данни)
-        const blob = await response.blob();
-        
-        // 3. Създаване на локален URL (blob:http://localhost:xxxx/....)
-        const blobUrl = URL.createObjectURL(blob);
-        activeBlobUrls.current.push(blobUrl); // Пазим го за почистване
+    const play = () => {
+      const sound = new Audio(safeUrl);
+      sound.volume = 1.0;
+      
+      sound.onplay = () => { 
+        console.log('Audio STARTED:', item.name);
+        stopCurrentAudio(); 
+        setIsAudioPlaying(true); 
+        currentAudioRef.current = sound; 
+      };
+      
+      sound.onended = () => { 
+        console.log('Audio ENDED:', item.name);
+        setIsAudioPlaying(false); 
+        currentAudioRef.current = null; 
+      };
+      
+      sound.onerror = (e) => {
+        console.error('Audio ERROR:', item.name, e);
+        playTone(200, 0.2); // Fallback
+      };
+      
+      // Просто .play() - без fetch, без blob, без headers
+      sound.play().catch((e) => {
+        console.warn('Autoplay prevented:', e);
+      });
 
-        // 4. Пускане на локалния URL
-        const sound = new Audio(blobUrl);
-        sound.volume = 1.0;
-
-        sound.onplay = () => { 
-            stopCurrentAudio(); 
-            setIsAudioPlaying(true); 
-            currentAudioRef.current = sound; 
-        };
-
-        sound.onended = () => { 
-            setIsAudioPlaying(false); 
-            currentAudioRef.current = null;
-            // Освобождаваме паметта след като свърши
-            URL.revokeObjectURL(blobUrl); 
-        };
-
-        sound.onerror = (e) => {
-             console.error("Blob playback failed", e);
-             playTone(200, 0.2); // Fallback
-        };
-
-        const playPromise = sound.play();
-        if (playPromise !== undefined) {
-            playPromise.catch(e => console.warn("Play blocked:", e));
-        }
-
-        audioObj = sound;
-
-      } catch (err) {
-        console.error("Manual fetch failed. Likely CORS or Network.", err);
-        // Последен опит - директно (понякога работи, ако fetch е блокиран)
-        const directSound = new Audio(item.audio!);
-        directSound.play().catch(() => playTone(200, 0.2));
-      }
+      audio = sound;
     };
 
     if (delay && delay > 0) {
@@ -170,8 +155,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     } else {
       play();
     }
-    
-    return audioObj;
+    return audio;
   };
 
   return (
