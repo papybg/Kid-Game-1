@@ -6,21 +6,18 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      // Тъй като config-а е в папка client, src е точно до него
       "@": path.resolve(__dirname, "src"),
-      // shared е едно ниво нагоре (извън папка client)
       "@shared": path.resolve(__dirname, "../shared"),
     },
   },
   
-  // ВАЖНО: Махнахме "root", защото файлът вече си е на правилното място
-  
   build: {
-    // Изкарваме билда в папка dist (едно ниво нагоре)
-    outDir: path.resolve(__dirname, "../dist/public"),
+    // ВРЪЩАМЕ ГО СТАНДАРТНО: Просто "dist" в текущата папка
+    outDir: "dist",
     emptyOutDir: true,
   },
   
+  // Запазваме проксито за да работи звука докато разработваш (npm run dev)
   server: {
     host: "0.0.0.0",
     proxy: {
