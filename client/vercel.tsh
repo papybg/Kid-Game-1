@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/game-audio/:path*",
+      "destination": "https://res.cloudinary.com/db8o7so6j/video/upload/:path*"
+    },
+    {
+      "source": "/game-images/:path*",
+      "destination": "https://res.cloudinary.com/db8o7so6j/image/upload/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/"
+    }
+  ]
+}
