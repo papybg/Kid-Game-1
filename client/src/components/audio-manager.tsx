@@ -34,6 +34,15 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const { soundEnabled, setSoundEnabled: storeSetSoundEnabled } = useSettingsStore();
   const { initializeAudio: initAudio, playTone } = useAudio();
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  
+  // Пазим URL-ите, за да чистим паметта
+  const activeBlobUrls = useRef<string[]>([]);
+
+  useEffect(() => {
+    return () => {
+      activeBlobUrls.current.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, []);
 
   const stopCurrentAudio = () => {
     if (currentAudioRef.current) {
@@ -52,16 +61,6 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Failed to initialize audio:', error);
     }
-  };
-
-  // Helper: Конструира прокси URL, но само ако сме в среда, която го поддържа
-  const getProxyUrl = (url: string) => {
-      if (!url || !url.includes('cloudinary.com')) return url;
-      const parts = url.split('/upload/');
-      if (parts.length === 2) {
-         return `/game-audio/${parts[1]}`;
-      }
-      return url;
   };
 
   const getSoundFile = (name: 'win' | 'bravo' | 'tryAgain'): HTMLAudioElement | null => {
@@ -101,55 +100,69 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     return voiceSound;
   };
 
+  // --- STEALTH MODE PLAYBACK ---
   const playItemSound = (item: GameItem, delay?: number): HTMLAudioElement | null => {
     if (!isInitialized || !soundEnabled || !item.audio) return null;
 
-    // СТРАТЕГИЯТА "УМЕН FALLBACK"
-    const proxyUrl = getProxyUrl(item.audio);
-    const originalUrl = item.audio;
+    let audioObj: HTMLAudioElement | null = null;
 
-    console.log(`Trying Proxy: ${proxyUrl}`);
+    const play = async () => {
+        try {
+            console.log(`Stealth fetching: ${item.name}`);
+            
+            // 1. ВАЖНО: credentials: 'omit' казва на Edge "Няма да ползвам бисквитки/storage"
+            // Това е магическият ключ, който заобикаля Tracking Prevention
+            const response = await fetch(item.audio!, {
+                method: 'GET',
+                credentials: 'omit', 
+                mode: 'cors',
+                headers: {
+                    // Опитваме се да не кешираме, за да не тригерваме storage error
+                    'Cache-Control': 'no-cache'
+                }
+            });
 
-    let audio: HTMLAudioElement | null = null;
-    
-    const play = () => {
-      // 1. Пробваме с Прокси URL-а
-      const sound = new Audio(proxyUrl);
-      sound.volume = 1.0;
-      
-      sound.onplay = () => { 
-        console.log('Audio STARTED (Proxy):', item.name);
-        stopCurrentAudio(); 
-        setIsAudioPlaying(true); 
-        currentAudioRef.current = sound; 
-      };
-      
-      sound.onended = () => { 
-        setIsAudioPlaying(false); 
-        currentAudioRef.current = null; 
-      };
-      
-      // 2. АКО ПРОКСИТО ГРЪМНЕ (404 грешката, която виждаш в лога)
-      sound.onerror = (e) => {
-        console.warn('Proxy failed (404 likely). Switching to Direct URL...', item.name);
-        
-        // Веднага сменяме източника на оригиналния
-        sound.src = originalUrl!;
-        
-        // Опитваме пак
-        sound.play().then(() => {
-            console.log('Audio recovered with Direct URL');
-        }).catch(err => {
-            console.error('Direct play also failed:', err);
-            playTone(200, 0.2); // Последен шанс - бип
-        });
-      };
-      
-      sound.play().catch((e) => {
-        console.warn('Autoplay prevented on proxy attempt:', e);
-      });
+            if (!response.ok) throw new Error(`Fetch status: ${response.status}`);
 
-      audio = sound;
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            activeBlobUrls.current.push(blobUrl);
+
+            const sound = new Audio(blobUrl);
+            sound.volume = 1.0;
+
+            sound.onplay = () => { 
+                stopCurrentAudio(); 
+                setIsAudioPlaying(true); 
+                currentAudioRef.current = sound; 
+            };
+
+            sound.onended = () => { 
+                setIsAudioPlaying(false); 
+                currentAudioRef.current = null;
+                URL.revokeObjectURL(blobUrl); // Чистим паметта
+            };
+            
+            sound.onerror = (e) => {
+                console.error("Blob playback error:", e);
+                // Последен опит с fallback тонче
+                playTone(300, 0.2); 
+            };
+
+            await sound.play();
+            audioObj = sound;
+
+        } catch (error) {
+            console.warn("Stealth fetch failed, trying direct play as last resort:", error);
+            
+            // Ако всичко пропадне, пробваме "глупавия" начин
+            // Добавяме рандъм параметър, за да излъжем кеша
+            const directUrl = `${item.audio}?t=${Date.now()}`;
+            const fallbackSound = new Audio(directUrl);
+            
+            // Този път БЕЗ crossOrigin, за да е "Opaque" заявка
+            fallbackSound.play().catch(e => console.error("Direct play blocked:", e));
+        }
     };
 
     if (delay && delay > 0) {
@@ -157,7 +170,8 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     } else {
       play();
     }
-    return audio;
+    
+    return audioObj;
   };
 
   return (
