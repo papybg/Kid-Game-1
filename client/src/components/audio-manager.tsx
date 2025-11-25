@@ -60,7 +60,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     if (!url) return null;
     
     const audio = new Audio();
-    audio.crossOrigin = "anonymous";
+    // Тук също махаме crossOrigin и ползваме локални файлове
     audio.src = url;
 
     audio.addEventListener('play', () => {
@@ -100,19 +100,24 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const playItemSound = (item: GameItem, delay?: number): HTMLAudioElement | null => {
     if (!isInitialized || !soundEnabled || !item.audio) return null;
     
-    // 1. ТРИКЪТ: Добавяме timestamp, за да излъжем кеша/tracking prevention на Edge
+    // Добавяме timestamp, за да избегнем кеша
     const uniqueUrl = `${item.audio}?t=${Date.now()}`;
-    console.log('Attempting to play:', item.name, uniqueUrl);
+    console.log('Attempting to play (No-CORS):', item.name, uniqueUrl);
 
     let audio: HTMLAudioElement | null = null;
     
     const play = () => {
       const sound = new Audio();
       
-      // 2. ВАЖНО: crossOrigin трябва да е преди src
-      sound.crossOrigin = "anonymous";
+      // ВАЖНО: Премахнахме crossOrigin = "anonymous". 
+      // Това прави заявката "Opaque" и Edge не би трябвало да я блокира за бисквитки.
+      
+      // Добавяме това за допълнителна защита от тракери
+      // @ts-ignore - Typescript може да се оплаче за referrerPolicy, но браузърът го разбира
+      sound.referrerPolicy = "no-referrer";
+      
       sound.src = uniqueUrl;
-      sound.volume = 1.0; // Усилваме звука
+      sound.volume = 1.0; 
       
       sound.onplay = () => { 
         console.log('Audio STARTED:', item.name);
@@ -129,18 +134,17 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       
       sound.onerror = (e) => {
           console.error("Audio LOAD Error:", item.name, e);
-          // Fallback: Ако mp3-то не тръгне, поне да чуем "бип"
+          // Ако пак не стане, пробваме синтетичен звук
           playTone(200, 0.1);
       };
       
-      // 3. Безопасно пускане
       const playPromise = sound.play();
 
       if (playPromise !== undefined) {
           playPromise.then(() => {
             // Успех
           }).catch((e) => {
-            console.warn('Playback prevented by browser:', e);
+            console.warn('Playback prevented:', e);
           });
       }
 
