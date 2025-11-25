@@ -1,3 +1,4 @@
+// Брой редове: 147
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useAudio } from "../hooks/use-audio";
 import { useSettingsStore } from "../lib/settings-store";
@@ -59,7 +60,11 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     const url = VOICE_FILES[name];
     if (!url) return null;
     
-    const audio = new Audio(url);
+    const audio = new Audio();
+    // 1. ВАЖНО: Разрешаваме CDN заявки без cookies
+    audio.crossOrigin = "anonymous";
+    audio.src = url;
+
     audio.addEventListener('play', () => {
       stopCurrentAudio();
       setIsAudioPlaying(true);
@@ -87,7 +92,6 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const playVoice = (type: 'bravo' | 'tryAgain'): HTMLAudioElement | null => {
     const voiceSound = getSoundFile(type);
     if (voiceSound) {
-        // FIX: Добавена проверка за undefined promise и тук
         const playPromise = voiceSound.play();
         if (playPromise !== undefined) {
             playPromise.catch(e => console.error(`Failed to play voice ${type}:`, e));
@@ -98,45 +102,45 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
 
   const playItemSound = (item: GameItem, delay?: number): HTMLAudioElement | null => {
     if (!isInitialized || !soundEnabled || !item.audio) return null;
-    console.log('playItemSound called with:', item.name, 'audio:', item.audio, 'delay:', delay);
+    console.log('playItemSound called with:', item.name, 'audio:', item.audio);
 
     let audio: HTMLAudioElement | null = null;
+    
     const play = () => {
-      console.log('Creating new Audio object for:', item.audio);
-      const sound = new Audio(item.audio!); // Разчитаме на данните от базата
+      // --- FIX: Correct handling of Cloudinary/CDN in Edge ---
+      const sound = new Audio();
+      sound.crossOrigin = "anonymous"; // Това казва на браузъра да не блокира файла заради Privacy
+      sound.src = item.audio!;
       sound.volume = 0.7;
       
       sound.addEventListener('play', () => { 
-        console.log('Audio play event for:', item.name);
+        console.log('Audio play started for:', item.name);
         stopCurrentAudio(); 
         setIsAudioPlaying(true); 
         currentAudioRef.current = sound; 
       });
       sound.addEventListener('ended', () => { 
-        console.log('Audio ended event for:', item.name);
         setIsAudioPlaying(false); 
         currentAudioRef.current = null; 
       });
       sound.addEventListener('error', (e) => { 
-        console.log('Audio error for:', item.name, e);
+        console.error('Audio error (check CORS/Format):', item.name, e);
         setIsAudioPlaying(false); 
         currentAudioRef.current = null; 
       });
       
-      // --- FIX START: Защита срещу Edge/Extensions ---
+      // Защита срещу блокиране на play()
       const playPromise = sound.play();
 
       if (playPromise !== undefined) {
           playPromise.then(() => {
-            console.log('Audio play() promise resolved for:', item.name);
+            console.log('Audio playing successfully:', item.name);
           }).catch((e) => {
-            console.log('Audio play() failed for:', item.name, e);
-            playTone(300, 0.3); // Fallback tone
+            console.warn('Playback prevented:', e);
+            // Fallback: Ако mp3-то не тръгне, пускаме "бип" от синтезатора
+            playTone(440, 0.1); 
           });
-      } else {
-          console.warn('Audio play() returned undefined. Blocked by browser/extension.');
       }
-      // --- FIX END ---
 
       audio = sound;
     };
