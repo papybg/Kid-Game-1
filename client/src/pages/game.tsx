@@ -140,7 +140,8 @@ export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameP
               playSound('bell');
               playItemSound(itemToPlace, 1000);
             }
-          }        if (isSimpleMode) setSelectedItem(null);
+          }
+        if (isSimpleMode) setSelectedItem(null);
       }, 1000);
     };
 
@@ -240,11 +241,14 @@ export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameP
         </div>
       )}
 
-      <div className="absolute bottom-0 left-0 right-0 z-20 p-4 bg-gradient-to-t from-black/50 to-transparent pb-[calc(env(safe-area-inset-bottom)+16px)]">
+      {/* ПРОМЕНЕН КОД ТУК: Махнахме градиента (bg-gradient-to-t) и вътрешните класове за background/blur */}
+      <div className="absolute bottom-0 left-0 right-0 z-20 p-4 pb-[calc(env(safe-area-inset-bottom)+16px)]">
         {(gameState.isPlaying || animatingItem) && !isGameComplete && (
           <div className="max-w-6xl mx-auto">
-            <div className="bg-black/10 backdrop-blur-sm rounded-2xl p-4">
-              <div ref={choiceZoneRef} className="choice-zone flex gap-3 overflow-x-auto pb-2" style={{ height: `${choiceZoneHeight}px` }}>
+            {/* Тук премахнахме <div className="bg-black/10 backdrop-blur-sm rounded-2xl p-4"> */}
+            <div className=""> 
+              {/* Добавихме 'justify-center', за да са центрирани предметите */}
+              <div ref={choiceZoneRef} className="choice-zone flex gap-3 justify-center overflow-x-auto pb-2" style={{ height: `${choiceZoneHeight}px` }}>
                 {gameState.choiceItems.map((item) => (
                   <ChoiceItem key={item.id} item={item} isUsed={gameState.usedItems.includes(item.id)} isDisabled={isAudioPlaying} isSelected={selectedItem?.id === item.id} isAnimating={animatingItem?.item.id === item.id} targetPosition={animatingItem?.item.id === item.id ? animatingItem.targetPosition : undefined} onClick={handleChoiceClick} />
                 ))}
