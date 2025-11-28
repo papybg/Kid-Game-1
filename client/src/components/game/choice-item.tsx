@@ -19,14 +19,13 @@ export function ChoiceItem({ item, isUsed, isDisabled, isSelected, isAnimating, 
     }
   };
 
-  // ПРЕМАХНАХМЕ обвиващия <div>. Сега връщаме директно <img>.
-  // Така гарантираме, че няма скрити кутийки или padding, които да правят сянка/фон.
   return (
     <img
       src={item.image || ""}
       alt={item.name}
+      // ПРОМЯНА ТУК: w-20 h-20 (за мобилни) и md:w-32 md:h-32 (за десктоп)
       className={cn(
-        "choice-item w-32 h-32 object-contain flex-shrink-0 transition-all duration-200 cursor-pointer drop-shadow-md hover:drop-shadow-xl", // Добавих drop-shadow, за да се вижда добре върху всякакъв фон
+        "choice-item w-20 h-20 md:w-32 md:h-32 object-contain flex-shrink-0 transition-all duration-200 cursor-pointer drop-shadow-md hover:drop-shadow-xl",
         {
           "used opacity-50 cursor-not-allowed": isUsed,
           "opacity-50 cursor-not-allowed": isDisabled,
