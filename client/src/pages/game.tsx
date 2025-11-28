@@ -26,7 +26,6 @@ export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameP
   const [animatingItem, setAnimatingItem] = useState<{item: GameItem, targetPosition: {top: number, left: number}} | null>(null);
   const [isAnimationInProgress, setIsAnimationInProgress] = useState(false);
   const choiceZoneRef = useRef<HTMLDivElement>(null);
-  // Намалихме височината на зоната, за да не заема излишно място
   const [choiceZoneHeight, setChoiceZoneHeight] = useState(100);
   
   const { soundEnabled, setSoundEnabled, playSound, playVoice, playItemSound, isAudioPlaying, getSoundFile } = useAudioContext();
@@ -188,15 +187,11 @@ export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameP
 
   return (
     <div className="fixed inset-0 w-full h-full overflow-hidden bg-black">
-      {/* 1. Използваме 'fixed inset-0', за да сме сигурни, че фонът не мърда.
-         2. 'bg-cover' гарантира, че картинката запълва всичко, без бели ленти.
-      */}
       <div 
         className="fixed inset-0 bg-cover bg-center bg-no-repeat transition-all duration-500 z-0" 
         style={{ backgroundImage: `url('${backgroundUrl}')` }}
       />
       
-      {/* Top Bar - Controls */}
       <div className="relative z-30 p-2 md:p-4">
         <div className="flex items-center justify-between">
           <Button variant="ghost" size="icon" onClick={onBackToMenu} className="w-10 h-10 md:w-12 md:h-12 glass rounded-xl hover:bg-white/20 text-white shadow-sm"><ArrowLeft className="w-5 h-5 md:w-6 md:h-6" /></Button>
@@ -213,7 +208,6 @@ export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameP
         </div>
       </div>
       
-      {/* Slots Layer */}
       <div className="absolute inset-0 z-10 pointer-events-none">
         {gameSession && gameSession.cells.map((slot: Slot) => {
             const slotId = `${slot.position.top}-${slot.position.left}`;
@@ -250,14 +244,22 @@ export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameP
         </div>
       )}
 
-      {/* ITEMS DOCK - Fix: Transparent background, fixed to bottom */}
-      <div className="absolute bottom-0 left-0 right-0 z-20 pb-2 md:pb-4 pointer-events-none">
+      {/* ITEMS DOCK - РАДИКАЛНО ИЗЧИСТВАНЕ */}
+      <div 
+        className="absolute bottom-0 left-0 right-0 z-20 pb-2 md:pb-4 pointer-events-none"
+        style={{ background: 'transparent', backdropFilter: 'none', WebkitBackdropFilter: 'none' }} // Насилствена прозрачност
+      >
         {(gameState.isPlaying || animatingItem) && !isGameComplete && (
           <div className="w-full flex justify-center pointer-events-auto">
-            {/* Тук е ключът: bg-transparent и никакво замъгляване. 
-               overflow-x-auto позволява скрол, ако животните са много.
-            */}
-            <div ref={choiceZoneRef} className="flex gap-2 md:gap-4 px-4 overflow-x-auto justify-center items-end bg-transparent no-scrollbar" style={{ height: `${choiceZoneHeight}px` }}>
+            <div 
+                ref={choiceZoneRef} 
+                className="flex gap-2 md:gap-4 px-4 overflow-x-auto justify-center items-end no-scrollbar" 
+                style={{ 
+                    height: `${choiceZoneHeight}px`,
+                    background: 'transparent', // Още едно ниво на сигурност
+                    boxShadow: 'none'
+                }}
+            >
               {gameState.choiceItems.map((item) => (
                 <ChoiceItem 
                     key={item.id} 
@@ -275,7 +277,6 @@ export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameP
         )}
       </div>
       
-      {/* Progress Bar */}
       <div className="absolute top-16 md:top-20 left-0 right-0 z-20 pointer-events-none flex justify-center">
         {gameSession && (
           <div className="w-48 md:w-64 bg-black/30 backdrop-blur-sm rounded-full p-1 border border-white/10">
