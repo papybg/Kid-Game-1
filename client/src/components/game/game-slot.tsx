@@ -10,7 +10,6 @@ interface GameSlotProps {
 }
 
 export function GameSlotComponent({ slot, isActive, isCompleted, placedItem, className }: GameSlotProps) {
-  const slotId = `${slot.position.top}-${slot.position.left}`;
   const hasPlacedItem = !!placedItem;
   
   return (
@@ -18,14 +17,17 @@ export function GameSlotComponent({ slot, isActive, isCompleted, placedItem, cla
       className={cn(
         "game-slot absolute rounded-full transition-all duration-200",
         {
-          // Default visible outline - only when no item is placed
-          "bg-white/6 backdrop-blur-sm border-4 border-solid border-white/80": !isActive && !hasPlacedItem && !isCompleted,
-          // Active slot: brighter ring + glow - only when no item is placed
-          "bg-white/6 backdrop-blur-sm border-4 border-yellow-400 ring-4 ring-yellow-300/60 shadow-[0_8px_20px_rgba(250,204,21,0.18)]": isActive && !hasPlacedItem,
-          // Filled slot: no border, no background - just the image
+          // ПРОМЯНА ТУК: Махнахме bg-white/6 и backdrop-blur-sm
+          // Оставихме само тънка рамка (border-white/40), за да се вижда къде е целта
+          "border-2 border-dashed border-white/50": !isActive && !hasPlacedItem && !isCompleted,
+          
+          // Активен слот: става малко по-видим
+          "border-4 border-yellow-400 ring-4 ring-yellow-300/40 shadow-[0_0_20px_rgba(250,204,21,0.4)]": isActive && !hasPlacedItem,
+          
+          // Пълен слот: напълно прозрачен
           "border-0 bg-transparent": hasPlacedItem,
-          // Completed: slightly dimmed
-          "opacity-70": isCompleted,
+          
+          "opacity-100": isCompleted, // Пълна видимост на готовия предмет
         },
         className
       )}
@@ -43,7 +45,7 @@ export function GameSlotComponent({ slot, isActive, isCompleted, placedItem, cla
           <img
             src={placedItem.image || ''}
             alt={placedItem.name}
-            className="w-full h-full object-contain transform"
+            className="w-full h-full object-contain transform drop-shadow-lg"
             style={{
               transform: placedItem.name === "Влак" ? "scale(3)" : "scale(1.5)"
             }}
