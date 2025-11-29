@@ -23,13 +23,15 @@ export function ChoiceItem({ item, isUsed, isDisabled, isSelected, isAnimating, 
     <img
       src={item.image || ""}
       alt={item.name}
-      // ПРОМЯНА ТУК: w-20 h-20 (за мобилни) и md:w-32 md:h-32 (за десктоп)
+      // ПРОМЯНА: 
+      // w-14 (56px) за мобилни - много компактно
+      // md:w-24 (96px) за таблети/лаптопи
+      // lg:w-32 (128px) за големи екрани
       className={cn(
-        "choice-item w-20 h-20 md:w-32 md:h-32 object-contain flex-shrink-0 transition-all duration-200 cursor-pointer drop-shadow-md hover:drop-shadow-xl",
+        "choice-item w-14 h-14 md:w-24 md:h-24 lg:w-32 lg:h-32 object-contain flex-shrink-0 transition-all duration-200 cursor-pointer drop-shadow-md hover:drop-shadow-xl hover:scale-110",
         {
           "used opacity-50 cursor-not-allowed": isUsed,
           "opacity-50 cursor-not-allowed": isDisabled,
-          "hover:scale-110": !isUsed && !isDisabled,
           "ring-4 ring-yellow-400 ring-opacity-75 scale-110": isSelected,
           "absolute z-50 transition-all duration-1000 ease-in-out": isAnimating,
         },
