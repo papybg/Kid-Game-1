@@ -21,12 +21,13 @@ interface GameProps {
 }
 
 export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameProps) {
+  // Следим дали екранът е "пейзажен" (Landscape) - по-широк отколкото висок
+  const [isLandscape, setIsLandscape] = useState(window.innerWidth > window.innerHeight);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  
   const [selectedItem, setSelectedItem] = useState<GameItem | null>(null);
   const [animatingItem, setAnimatingItem] = useState<{item: GameItem, targetPosition: {top: number, left: number}} | null>(null);
   const [isAnimationInProgress, setIsAnimationInProgress] = useState(false);
-  const choiceZoneRef = useRef<HTMLDivElement>(null);
-  const [choiceZoneHeight, setChoiceZoneHeight] = useState(100);
   
   const { soundEnabled, setSoundEnabled, playSound, playVoice, playItemSound, isAudioPlaying, getSoundFile } = useAudioContext();
   const { gameMode } = useSettingsStore();
@@ -52,7 +53,10 @@ export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameP
   } = useGameState({ cells: gameSession?.cells, items: gameSession?.items, variantId });
 
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    const handleResize = () => {
+        setIsMobile(window.innerWidth < 768);
+        setIsLandscape(window.innerWidth > window.innerHeight);
+    };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -60,22 +64,20 @@ export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameP
   useEffect(() => {
     const requestFullscreen = async () => {
       try {
-        if (!document.fullscreenElement) {
-          if (document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen();
+        if (!document.fullscreenElement && isMobile) {
+           if (document.documentElement.requestFullscreen) {
+               await document.documentElement.requestFullscreen().catch(() => {});
+           }
         }
-      } catch (error) {
-        console.warn('Could not enter fullscreen mode:', error);
-      }
+      } catch (error) { }
     };
-    requestFullscreen();
-  }, []);
-
-  useLayoutEffect(() => {
-    if (gameState.choiceItems.length > 0 && choiceZoneRef.current) {
-      const maxHeight = Array.from(choiceZoneRef.current.children).reduce((max, child) => Math.max(max, (child as HTMLElement).getBoundingClientRect().height), 0);
-      if (maxHeight > 0) setChoiceZoneHeight(Math.ceil(maxHeight));
-    }
-  }, [gameState.choiceItems]);
+    const handleInteraction = () => {
+        requestFullscreen();
+        window.removeEventListener('click', handleInteraction);
+    };
+    window.addEventListener('click', handleInteraction);
+    return () => window.removeEventListener('click', handleInteraction);
+  }, [isMobile]);
 
   const toggleSound = () => setSoundEnabled(!soundEnabled);
   
@@ -85,9 +87,7 @@ export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameP
     if (isGameComplete && !isAnimationInProgress && !isAudioPlaying) {
       const winSound = getSoundFile('win');
       if (winSound) {
-        winSound.onended = () => {
-           setTimeout(onWin, 500);
-        };
+        winSound.onended = () => { setTimeout(onWin, 500); };
         winSound.play();
       } else {
         setTimeout(onWin, 2000);
@@ -116,7 +116,6 @@ export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameP
       setTimeout(() => {
         setAnimatingItem(null);
         setIsAnimationInProgress(false);
-
           if (isWinningMove) {
             playSound('bell');
             const finalAnimalSound = playItemSound(itemToPlace, 0);
@@ -185,21 +184,26 @@ export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameP
   
   const backgroundUrl = isMobile ? gameSession?.layout?.backgroundSmall : gameSession?.layout?.backgroundLarge;
 
+  // Логика за разделяне на предметите (за пейзажен режим)
+  const midpoint = Math.ceil(gameState.choiceItems.length / 2);
+  const leftItems = gameState.choiceItems.slice(0, midpoint);
+  const rightItems = gameState.choiceItems.slice(midpoint);
+
   return (
-    <div className="fixed inset-0 w-full h-full overflow-hidden bg-black">
+    <div className="fixed inset-0 w-full h-[100dvh] overflow-hidden bg-black">
+      
+      {/* BACKGROUND - Винаги покрива целия екран (bg-cover) */}
       <div 
-        className="fixed inset-0 bg-cover bg-center bg-no-repeat transition-all duration-500 z-0" 
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat z-0" 
         style={{ backgroundImage: `url('${backgroundUrl}')` }}
       />
       
+      {/* TOP CONTROLS */}
       <div className="relative z-30 p-2 md:p-4">
         <div className="flex items-center justify-between">
           <Button variant="ghost" size="icon" onClick={onBackToMenu} className="w-10 h-10 md:w-12 md:h-12 glass rounded-xl hover:bg-white/20 text-white shadow-sm"><ArrowLeft className="w-5 h-5 md:w-6 md:h-6" /></Button>
           <div className="text-center text-white drop-shadow-md">
             <h1 className="font-display font-bold text-lg md:text-2xl shadow-black">Игра</h1>
-            <div className="text-xs md:text-sm bg-black/30 backdrop-blur-md rounded-full px-4 py-1 mt-1 inline-block border border-white/10">
-                {gameState.isPlaying ? "Къде ще сложиш това?" : "Натисни СТАРТ"}
-            </div>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={pauseGame} className="w-10 h-10 md:w-12 md:h-12 glass rounded-xl hover:bg-white/20 text-white shadow-sm">{gameState.isPaused ? <Play className="w-5 h-5 md:w-6 md:h-6" /> : <Pause className="w-5 h-5 md:w-6 md:h-6" />}</Button>
@@ -208,6 +212,7 @@ export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameP
         </div>
       </div>
       
+      {/* SLOTS */}
       <div className="absolute inset-0 z-10 pointer-events-none">
         {gameSession && gameSession.cells.map((slot: Slot) => {
             const slotId = `${slot.position.top}-${slot.position.left}`;
@@ -221,6 +226,7 @@ export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameP
       
       <FeedbackMessageComponent feedback={feedback} />
       
+      {/* PAUSE & START OVERLAYS... */}
       {gameState.isPaused && gameState.isPlaying && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="text-center text-white">
@@ -233,7 +239,6 @@ export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameP
           </div>
         </div>
       )}
-      
       {!gameState.isPlaying && !isGameComplete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
           <div className="pointer-events-auto">
@@ -244,40 +249,54 @@ export default function Game({ portalId, variantId, onBackToMenu, onWin }: GameP
         </div>
       )}
 
-      {/* ITEMS DOCK - РАДИКАЛНО ИЗЧИСТВАНЕ */}
-      <div 
-        className="absolute bottom-0 left-0 right-0 z-20 pb-2 md:pb-4 pointer-events-none"
-        style={{ background: 'transparent', backdropFilter: 'none', WebkitBackdropFilter: 'none' }} // Насилствена прозрачност
-      >
-        {(gameState.isPlaying || animatingItem) && !isGameComplete && (
-          <div className="w-full flex justify-center pointer-events-auto">
-            <div 
-                ref={choiceZoneRef} 
-                className="flex gap-2 md:gap-4 px-4 overflow-x-auto justify-center items-end no-scrollbar" 
-                style={{ 
-                    height: `${choiceZoneHeight}px`,
-                    background: 'transparent', // Още едно ниво на сигурност
-                    boxShadow: 'none'
-                }}
-            >
-              {gameState.choiceItems.map((item) => (
-                <ChoiceItem 
-                    key={item.id} 
-                    item={item} 
-                    isUsed={gameState.usedItems.includes(item.id)} 
-                    isDisabled={isAudioPlaying} 
-                    isSelected={selectedItem?.id === item.id} 
-                    isAnimating={animatingItem?.item.id === item.id} 
-                    targetPosition={animatingItem?.item.id === item.id ? animatingItem.targetPosition : undefined} 
-                    onClick={handleChoiceClick} 
-                />
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+      {/* --- ITEMS LAYOUT LOGIC --- */}
+      {(gameState.isPlaying || animatingItem) && !isGameComplete && (
+         <>
+            {/* 1. PORTRAIT MODE: Items at Bottom */}
+            {!isLandscape && (
+                <div className="absolute bottom-0 left-0 right-0 z-20 pointer-events-none pb-[calc(env(safe-area-inset-bottom)+10px)]">
+                    <div className="w-full flex justify-center pointer-events-auto">
+                        <div className="flex gap-2 px-2 overflow-x-auto justify-center items-end no-scrollbar w-full">
+                            {gameState.choiceItems.map((item) => (
+                                <ChoiceItem 
+                                    key={item.id} item={item} 
+                                    isUsed={gameState.usedItems.includes(item.id)} isDisabled={isAudioPlaying} isSelected={selectedItem?.id === item.id} isAnimating={animatingItem?.item.id === item.id} targetPosition={animatingItem?.item.id === item.id ? animatingItem.targetPosition : undefined} onClick={handleChoiceClick} 
+                                />
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 2. LANDSCAPE MODE: Split Left and Right */}
+            {isLandscape && (
+                <>
+                    {/* LEFT COLUMN */}
+                    <div className="absolute left-2 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-2 md:gap-4 pointer-events-auto max-h-[80vh] overflow-y-auto no-scrollbar py-2">
+                        {leftItems.map((item) => (
+                             <ChoiceItem 
+                                key={item.id} item={item} 
+                                isUsed={gameState.usedItems.includes(item.id)} isDisabled={isAudioPlaying} isSelected={selectedItem?.id === item.id} isAnimating={animatingItem?.item.id === item.id} targetPosition={animatingItem?.item.id === item.id ? animatingItem.targetPosition : undefined} onClick={handleChoiceClick} 
+                            />
+                        ))}
+                    </div>
+
+                    {/* RIGHT COLUMN */}
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-2 md:gap-4 pointer-events-auto max-h-[80vh] overflow-y-auto no-scrollbar py-2">
+                        {rightItems.map((item) => (
+                             <ChoiceItem 
+                                key={item.id} item={item} 
+                                isUsed={gameState.usedItems.includes(item.id)} isDisabled={isAudioPlaying} isSelected={selectedItem?.id === item.id} isAnimating={animatingItem?.item.id === item.id} targetPosition={animatingItem?.item.id === item.id ? animatingItem.targetPosition : undefined} onClick={handleChoiceClick} 
+                            />
+                        ))}
+                    </div>
+                </>
+            )}
+         </>
+      )}
       
-      <div className="absolute top-16 md:top-20 left-0 right-0 z-20 pointer-events-none flex justify-center">
+      {/* PROGRESS BAR */}
+      <div className="absolute top-14 md:top-20 left-0 right-0 z-20 pointer-events-none flex justify-center">
         {gameSession && (
           <div className="w-48 md:w-64 bg-black/30 backdrop-blur-sm rounded-full p-1 border border-white/10">
             <div className="w-full bg-white/10 rounded-full h-1.5 md:h-2 overflow-hidden">
