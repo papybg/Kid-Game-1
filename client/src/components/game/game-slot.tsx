@@ -17,12 +17,11 @@ export function GameSlotComponent({ slot, isActive, isCompleted, placedItem, cla
       className={cn(
         "game-slot absolute rounded-full transition-all duration-200",
         {
-          // ПРОМЯНА ТУК: Махнахме bg-white/6 и backdrop-blur-sm
-          // Оставихме само тънка рамка (border-white/40), за да се вижда къде е целта
-          "border-2 border-dashed border-white/50": !isActive && !hasPlacedItem && !isCompleted,
+          // ПРОМЯНА ТУК: Увеличихме дебелината на рамката
+          "border-4 border-dashed border-white/50": !isActive && !hasPlacedItem && !isCompleted,
           
           // Активен слот: става малко по-видим
-          "border-4 border-yellow-400 ring-4 ring-yellow-300/40 shadow-[0_0_20px_rgba(250,204,21,0.4)]": isActive && !hasPlacedItem,
+          "border-6 border-yellow-400 ring-6 ring-yellow-300/40 shadow-[0_0_20px_rgba(250,204,21,0.4)]": isActive && !hasPlacedItem,
           
           // Пълен слот: напълно прозрачен
           "border-0 bg-transparent": hasPlacedItem,
@@ -57,3 +56,4 @@ export function GameSlotComponent({ slot, isActive, isCompleted, placedItem, cla
     </div>
   );
 }
+
