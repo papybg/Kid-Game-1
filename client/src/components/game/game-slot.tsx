@@ -18,10 +18,10 @@ export function GameSlotComponent({ slot, isActive, isCompleted, placedItem, cla
         "game-slot absolute rounded-full transition-all duration-200",
         {
           // ПРОМЯНА ТУК: Увеличихме дебелината на рамката
-          "border-4 border-dashed border-white/50": !isActive && !hasPlacedItem && !isCompleted,
+          "border-8 border-dashed border-white/50": !isActive && !hasPlacedItem && !isCompleted,
           
           // Активен слот: става малко по-видим
-          "border-6 border-yellow-400 ring-6 ring-yellow-300/40 shadow-[0_0_20px_rgba(250,204,21,0.4)]": isActive && !hasPlacedItem,
+          "border-12 border-yellow-400 ring-12 ring-yellow-300/40 shadow-[0_0_20px_rgba(250,204,21,0.4)]": isActive && !hasPlacedItem,
           
           // Пълен слот: напълно прозрачен
           "border-0 bg-transparent": hasPlacedItem,
